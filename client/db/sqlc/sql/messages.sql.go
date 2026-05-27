@@ -3,7 +3,7 @@
 //   sqlc v1.31.1
 // source: messages.sql
 
-package db
+package sql
 
 import (
 	"context"
@@ -11,40 +11,28 @@ import (
 
 const createMessage = `-- name: CreateMessage :exec
 INSERT INTO messages (
-  id,
   conversation_id,
   sender_id,
-  recipient_id,
   body,
-  created_at,
-  direction,
-  delivery_state
+  created_at
 ) VALUES (
-  ?, ?, ?, ?, ?, ?, ?, ?
+  ?, ?, ?, ?
 )
 `
 
 type CreateMessageParams struct {
-	ID             string `db:"id" json:"id"`
 	ConversationID string `db:"conversation_id" json:"conversation_id"`
 	SenderID       string `db:"sender_id" json:"sender_id"`
-	RecipientID    string `db:"recipient_id" json:"recipient_id"`
 	Body           string `db:"body" json:"body"`
 	CreatedAt      int64  `db:"created_at" json:"created_at"`
-	Direction      string `db:"direction" json:"direction"`
-	DeliveryState  string `db:"delivery_state" json:"delivery_state"`
 }
 
 func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) error {
 	_, err := q.db.ExecContext(ctx, createMessage,
-		arg.ID,
 		arg.ConversationID,
 		arg.SenderID,
-		arg.RecipientID,
 		arg.Body,
 		arg.CreatedAt,
-		arg.Direction,
-		arg.DeliveryState,
 	)
 	return err
 }
@@ -54,29 +42,62 @@ SELECT
   id,
   conversation_id,
   sender_id,
-  recipient_id,
   body,
-  created_at,
-  direction,
-  delivery_state
+  created_at
 FROM messages
 WHERE id = ?
 `
 
-func (q *Queries) GetMessage(ctx context.Context, id string) (Message, error) {
+func (q *Queries) GetMessage(ctx context.Context, id int64) (Message, error) {
 	row := q.db.QueryRowContext(ctx, getMessage, id)
 	var i Message
 	err := row.Scan(
 		&i.ID,
 		&i.ConversationID,
 		&i.SenderID,
-		&i.RecipientID,
 		&i.Body,
 		&i.CreatedAt,
-		&i.Direction,
-		&i.DeliveryState,
 	)
 	return i, err
+}
+
+const getMessages = `-- name: GetMessages :many
+SELECT
+  id,
+  conversation_id,
+  sender_id,
+  body,
+  created_at
+FROM messages
+`
+
+func (q *Queries) GetMessages(ctx context.Context) ([]Message, error) {
+	rows, err := q.db.QueryContext(ctx, getMessages)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Message{}
+	for rows.Next() {
+		var i Message
+		if err := rows.Scan(
+			&i.ID,
+			&i.ConversationID,
+			&i.SenderID,
+			&i.Body,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listMessagesByConversation = `-- name: ListMessagesByConversation :many
@@ -84,11 +105,8 @@ SELECT
   id,
   conversation_id,
   sender_id,
-  recipient_id,
   body,
-  created_at,
-  direction,
-  delivery_state
+  created_at
 FROM messages
 WHERE conversation_id = ?
 ORDER BY created_at ASC
@@ -107,11 +125,8 @@ func (q *Queries) ListMessagesByConversation(ctx context.Context, conversationID
 			&i.ID,
 			&i.ConversationID,
 			&i.SenderID,
-			&i.RecipientID,
 			&i.Body,
 			&i.CreatedAt,
-			&i.Direction,
-			&i.DeliveryState,
 		); err != nil {
 			return nil, err
 		}
@@ -124,20 +139,4 @@ func (q *Queries) ListMessagesByConversation(ctx context.Context, conversationID
 		return nil, err
 	}
 	return items, nil
-}
-
-const updateMessageDeliveryState = `-- name: UpdateMessageDeliveryState :exec
-UPDATE messages
-SET delivery_state = ?
-WHERE id = ?
-`
-
-type UpdateMessageDeliveryStateParams struct {
-	DeliveryState string `db:"delivery_state" json:"delivery_state"`
-	ID            string `db:"id" json:"id"`
-}
-
-func (q *Queries) UpdateMessageDeliveryState(ctx context.Context, arg UpdateMessageDeliveryStateParams) error {
-	_, err := q.db.ExecContext(ctx, updateMessageDeliveryState, arg.DeliveryState, arg.ID)
-	return err
 }
