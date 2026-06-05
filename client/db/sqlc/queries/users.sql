@@ -3,6 +3,7 @@ SELECT
 	id,
 	name,
 	username,
-	hashed_password
+	hashed_password,
+	friend_code
 FROM users
 WHERE id = ?;

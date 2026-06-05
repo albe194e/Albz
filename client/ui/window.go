@@ -2,18 +2,21 @@ package ui
 
 import (
 	"context"
+	"runtime"
 
 	"fyne.io/fyne/v2"
-	fyneapp "fyne.io/fyne/v2/app"
 
 	clientapp "github.com/albe194e/albz/client/app"
-	"github.com/albe194e/albz/client/input"
 )
 
-func Run(c *clientapp.Controller, userInput *input.Input, uiState *UIState) {
-	a := fyneapp.New()
+func Run(a fyne.App, c *clientapp.Controller, uiState *UIState) {
 	w := a.NewWindow("Albz")
-	router := NewRouter(w, c, userInput, uiState)
+	router := NewRouter(w, c, uiState)
+	c.OnStateChanged = func() {
+		fyne.Do(func() {
+			router.NavigateTo(router.State.Page)
+		})
+	}
 
 	uiState.Page = Landing
 	if err := c.VerifySession(context.Background()); err == nil {
@@ -22,9 +25,11 @@ func Run(c *clientapp.Controller, userInput *input.Input, uiState *UIState) {
 
 	router.NavigateTo(uiState.Page)
 
-	w.Resize(fyne.NewSize(900, 600))
+	if runtime.GOOS != "android" {
+		w.Resize(fyne.NewSize(1120, 760))
+	}
 	w.ShowAndRun()
 
 	_ = c
-	_ = userInput
+	_ = uiState
 }

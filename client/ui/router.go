@@ -2,13 +2,13 @@ package ui
 
 import (
 	"fmt"
+	"runtime"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 
 	clientapp "github.com/albe194e/albz/client/app"
-	"github.com/albe194e/albz/client/input"
 )
 
 type pageRenderer func(*Router) fyne.CanvasObject
@@ -18,15 +18,13 @@ var pageRenderers = map[Page]pageRenderer{}
 type Router struct {
 	Window     fyne.Window
 	Controller *clientapp.Controller
-	UserInput  *input.Input
 	State      *UIState
 }
 
-func NewRouter(window fyne.Window, controller *clientapp.Controller, userInput *input.Input, state *UIState) *Router {
+func NewRouter(window fyne.Window, controller *clientapp.Controller, state *UIState) *Router {
 	return &Router{
 		Window:     window,
 		Controller: controller,
-		UserInput:  userInput,
 		State:      state,
 	}
 }
@@ -56,5 +54,25 @@ func (r *Router) NavigateTo(page Page) {
 
 func pageWithBackground(content fyne.CanvasObject) fyne.CanvasObject {
 	bg := canvas.NewRectangle(CurrentTheme.AppBackground)
-	return container.NewStack(bg, content)
+	accent := canvas.NewRectangle(CurrentTheme.Surface)
+	accent.SetMinSize(fyne.NewSize(0, 140))
+
+	return container.NewStack(
+		bg,
+		container.NewBorder(accent, nil, nil, nil, nil),
+		content,
+	)
+}
+
+func (r *Router) IsCompactLayout() bool {
+	if runtime.GOOS == "android" {
+		return true
+	}
+
+	size := r.Window.Canvas().Size()
+	return size.Width > 0 && size.Width < 760
+}
+
+func (r *Router) IsMobileLayout() bool {
+	return runtime.GOOS == "android"
 }

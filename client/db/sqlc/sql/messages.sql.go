@@ -13,26 +13,32 @@ const createMessage = `-- name: CreateMessage :exec
 INSERT INTO messages (
   conversation_id,
   sender_id,
+  client_message_id,
   body,
-  created_at
+  created_at,
+  delivery_state
 ) VALUES (
-  ?, ?, ?, ?
+  ?, ?, ?, ?, ?, ?
 )
 `
 
 type CreateMessageParams struct {
-	ConversationID string `db:"conversation_id" json:"conversation_id"`
-	SenderID       string `db:"sender_id" json:"sender_id"`
-	Body           string `db:"body" json:"body"`
-	CreatedAt      int64  `db:"created_at" json:"created_at"`
+	ConversationID  string `db:"conversation_id" json:"conversation_id"`
+	SenderID        string `db:"sender_id" json:"sender_id"`
+	ClientMessageID string `db:"client_message_id" json:"client_message_id"`
+	Body            string `db:"body" json:"body"`
+	CreatedAt       int64  `db:"created_at" json:"created_at"`
+	DeliveryState   string `db:"delivery_state" json:"delivery_state"`
 }
 
 func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) error {
 	_, err := q.db.ExecContext(ctx, createMessage,
 		arg.ConversationID,
 		arg.SenderID,
+		arg.ClientMessageID,
 		arg.Body,
 		arg.CreatedAt,
+		arg.DeliveryState,
 	)
 	return err
 }
@@ -42,8 +48,10 @@ SELECT
   id,
   conversation_id,
   sender_id,
+  client_message_id,
   body,
-  created_at
+  created_at,
+  delivery_state
 FROM messages
 WHERE id = ?
 `
@@ -55,8 +63,10 @@ func (q *Queries) GetMessage(ctx context.Context, id int64) (Message, error) {
 		&i.ID,
 		&i.ConversationID,
 		&i.SenderID,
+		&i.ClientMessageID,
 		&i.Body,
 		&i.CreatedAt,
+		&i.DeliveryState,
 	)
 	return i, err
 }
@@ -66,8 +76,10 @@ SELECT
   id,
   conversation_id,
   sender_id,
+  client_message_id,
   body,
-  created_at
+  created_at,
+  delivery_state
 FROM messages
 `
 
@@ -84,8 +96,10 @@ func (q *Queries) GetMessages(ctx context.Context) ([]Message, error) {
 			&i.ID,
 			&i.ConversationID,
 			&i.SenderID,
+			&i.ClientMessageID,
 			&i.Body,
 			&i.CreatedAt,
+			&i.DeliveryState,
 		); err != nil {
 			return nil, err
 		}
@@ -105,8 +119,10 @@ SELECT
   id,
   conversation_id,
   sender_id,
+  client_message_id,
   body,
-  created_at
+  created_at,
+  delivery_state
 FROM messages
 WHERE conversation_id = ?
 ORDER BY created_at ASC
@@ -125,8 +141,10 @@ func (q *Queries) ListMessagesByConversation(ctx context.Context, conversationID
 			&i.ID,
 			&i.ConversationID,
 			&i.SenderID,
+			&i.ClientMessageID,
 			&i.Body,
 			&i.CreatedAt,
+			&i.DeliveryState,
 		); err != nil {
 			return nil, err
 		}
@@ -139,4 +157,20 @@ func (q *Queries) ListMessagesByConversation(ctx context.Context, conversationID
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateMessageDeliveryStateByClientMessageID = `-- name: UpdateMessageDeliveryStateByClientMessageID :exec
+UPDATE messages
+SET delivery_state = ?
+WHERE client_message_id = ?
+`
+
+type UpdateMessageDeliveryStateByClientMessageIDParams struct {
+	DeliveryState   string `db:"delivery_state" json:"delivery_state"`
+	ClientMessageID string `db:"client_message_id" json:"client_message_id"`
+}
+
+func (q *Queries) UpdateMessageDeliveryStateByClientMessageID(ctx context.Context, arg UpdateMessageDeliveryStateByClientMessageIDParams) error {
+	_, err := q.db.ExecContext(ctx, updateMessageDeliveryStateByClientMessageID, arg.DeliveryState, arg.ClientMessageID)
+	return err
 }

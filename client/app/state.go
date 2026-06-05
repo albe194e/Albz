@@ -10,9 +10,13 @@ import (
 
 type AppState struct {
 	CurrentUser          *sql.User
-	ActiveConversationID string
 	Messages             []sql.Message
 	Conversations        []sql.Conversation
+	Friends              []sql.Friend
+	FriendRequests       []sql.FriendRequest
+	LoadedConversationID string
+	ServerConnected      bool
+	LastNetworkError     string
 }
 
 func (s *AppState) InitStateFromDB(ctx context.Context, store *storage.Store) error {
@@ -25,6 +29,20 @@ func (s *AppState) InitStateFromDB(ctx context.Context, store *storage.Store) er
 		return err
 	}
 
+	friends, err := store.Q.ListFriends(ctx)
+	if err != nil {
+		return err
+	}
+
+	friendRequests, err := store.Q.ListFriendRequests(ctx)
+	if err != nil {
+		return err
+	}
+
 	s.Conversations = convs
+	s.Friends = friends
+	s.FriendRequests = friendRequests
+	s.Messages = nil
+	s.LoadedConversationID = ""
 	return nil
 }

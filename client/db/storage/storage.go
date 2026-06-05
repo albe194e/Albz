@@ -18,9 +18,12 @@ type Store struct {
 	Q  *db.Queries
 }
 
-func OpenSQLite(ctx context.Context, dbPath string, schemaPath string) (*Store, error) {
+func OpenSQLite(ctx context.Context, dbPath string, schemaSQL string) (*Store, error) {
 	if dbPath == "" {
 		return nil, fmt.Errorf("db path is required")
+	}
+	if strings.TrimSpace(schemaSQL) == "" {
+		return nil, fmt.Errorf("schema SQL is required")
 	}
 
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
@@ -39,11 +42,7 @@ func OpenSQLite(ctx context.Context, dbPath string, schemaPath string) (*Store, 
 		return nil, fmt.Errorf("ping sqlite: %w", err)
 	}
 
-	schemaBytes, err := os.ReadFile(schemaPath)
-	if err != nil {
-		_ = conn.Close()
-		return nil, fmt.Errorf("read schema file %q: %w", schemaPath, err)
-	}
+	schemaBytes := []byte(schemaSQL)
 
 	if _, err := conn.ExecContext(ctx, string(schemaBytes)); err != nil {
 		_ = conn.Close()
@@ -63,6 +62,16 @@ func OpenSQLite(ctx context.Context, dbPath string, schemaPath string) (*Store, 
 	if err := migrateMessagesTable(ctx, conn, schemaBytes); err != nil {
 		_ = conn.Close()
 		return nil, fmt.Errorf("migrate messages table: %w", err)
+	}
+
+	if err := migrateFriendsTable(ctx, conn); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("migrate friends table: %w", err)
+	}
+
+	if err := migrateFriendRequestsTable(ctx, conn); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("migrate friend requests table: %w", err)
 	}
 
 	return &Store{
@@ -129,20 +138,27 @@ func migrateUsersTable(ctx context.Context, conn *sql.DB, schemaBytes []byte) er
 		hashedPasswordExpr = "''"
 	}
 
+	friendCodeExpr := "friend_code"
+	if _, ok := legacyColumns["friend_code"]; !ok {
+		friendCodeExpr = "'ALBZ-' || UPPER(HEX(RANDOMBLOB(6)))"
+	}
+
 	copyQuery := fmt.Sprintf(`
 INSERT INTO users (
   id,
   name,
   username,
-  hashed_password
+  hashed_password,
+  friend_code
 )
 SELECT
   %s,
   %s,
   %s,
+  %s,
   %s
 FROM users_legacy;
-`, idExpr, nameExpr, usernameExpr, hashedPasswordExpr)
+`, idExpr, nameExpr, usernameExpr, hashedPasswordExpr, friendCodeExpr)
 
 	if _, err := tx.ExecContext(ctx, copyQuery); err != nil {
 		return fmt.Errorf("copy legacy users: %w", err)
@@ -160,7 +176,7 @@ FROM users_legacy;
 }
 
 func migrateMessagesTable(ctx context.Context, conn *sql.DB, schemaBytes []byte) error {
-	needsMigration, err := messagesTableNeedsIDMigration(ctx, conn)
+	needsMigration, err := messagesTableNeedsMigration(ctx, conn)
 	if err != nil {
 		return err
 	}
@@ -193,22 +209,42 @@ func migrateMessagesTable(ctx context.Context, conn *sql.DB, schemaBytes []byte)
 		return err
 	}
 
-	columnsToCopy := []string{"conversation_id", "sender_id", "body", "created_at"}
-	for _, column := range columnsToCopy {
+	requiredColumns := []string{"conversation_id", "sender_id", "body", "created_at"}
+	for _, column := range requiredColumns {
 		if _, ok := legacyColumns[column]; !ok {
 			return fmt.Errorf("legacy messages table is missing required column %q", column)
 		}
 	}
 
+	clientMessageIDExpr := "'legacy-' || rowid"
+	if _, ok := legacyColumns["client_message_id"]; ok {
+		clientMessageIDExpr = "client_message_id"
+	}
+
+	deliveryStateExpr := "'delivered'"
+	if _, ok := legacyColumns["delivery_state"]; ok {
+		deliveryStateExpr = "delivery_state"
+	}
+
 	copyQuery := fmt.Sprintf(`
 INSERT INTO messages (
-  %s
+  conversation_id,
+  sender_id,
+  client_message_id,
+  body,
+  created_at,
+  delivery_state
 )
 SELECT
+  conversation_id,
+  sender_id,
+  %s,
+  body,
+  created_at,
   %s
 FROM messages_legacy
 ORDER BY created_at ASC, rowid ASC;
-`, strings.Join(columnsToCopy, ", "), strings.Join(columnsToCopy, ", "))
+`, clientMessageIDExpr, deliveryStateExpr)
 
 	if _, err := tx.ExecContext(ctx, copyQuery); err != nil {
 		return fmt.Errorf("copy legacy messages: %w", err)
@@ -242,7 +278,49 @@ func migrateConversationsTable(ctx context.Context, conn *sql.DB) error {
 	return nil
 }
 
-func messagesTableNeedsIDMigration(ctx context.Context, conn *sql.DB) (bool, error) {
+func migrateFriendsTable(ctx context.Context, conn *sql.DB) error {
+	columnTypes, err := tableColumnTypes(ctx, conn, "friends")
+	if err != nil {
+		return err
+	}
+
+	if _, ok := columnTypes["name"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE friends ADD COLUMN name TEXT NOT NULL DEFAULT '';`); err != nil {
+			return fmt.Errorf("add friends.name column: %w", err)
+		}
+	}
+
+	if _, ok := columnTypes["username"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE friends ADD COLUMN username TEXT NOT NULL DEFAULT '';`); err != nil {
+			return fmt.Errorf("add friends.username column: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func migrateFriendRequestsTable(ctx context.Context, conn *sql.DB) error {
+	columnTypes, err := tableColumnTypes(ctx, conn, "friend_requests")
+	if err != nil {
+		return err
+	}
+
+	if _, ok := columnTypes["name"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE friend_requests ADD COLUMN name TEXT NOT NULL DEFAULT '';`); err != nil {
+			return fmt.Errorf("add friend_requests.name column: %w", err)
+		}
+	}
+
+	if _, ok := columnTypes["username"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE friend_requests ADD COLUMN username TEXT NOT NULL DEFAULT '';`); err != nil {
+			return fmt.Errorf("add friend_requests.username column: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func messagesTableNeedsMigration(ctx context.Context, conn *sql.DB) (bool, error) {
 	columnTypes, err := tableColumnTypes(ctx, conn, "messages")
 	if err != nil {
 		return false, err
@@ -253,7 +331,19 @@ func messagesTableNeedsIDMigration(ctx context.Context, conn *sql.DB) (bool, err
 		return true, nil
 	}
 
-	return !strings.EqualFold(strings.TrimSpace(idType), "INTEGER"), nil
+	if !strings.EqualFold(strings.TrimSpace(idType), "INTEGER") {
+		return true, nil
+	}
+
+	if _, ok := columnTypes["client_message_id"]; !ok {
+		return true, nil
+	}
+
+	if _, ok := columnTypes["delivery_state"]; !ok {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func usersTableNeedsIDMigration(ctx context.Context, conn *sql.DB) (bool, error) {
@@ -263,6 +353,10 @@ func usersTableNeedsIDMigration(ctx context.Context, conn *sql.DB) (bool, error)
 	}
 
 	if _, ok := columnTypes["id"]; !ok {
+		return true, nil
+	}
+
+	if _, ok := columnTypes["friend_code"]; !ok {
 		return true, nil
 	}
 

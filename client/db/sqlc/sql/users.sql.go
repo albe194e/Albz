@@ -14,7 +14,8 @@ SELECT
 	id,
 	name,
 	username,
-	hashed_password
+	hashed_password,
+	friend_code
 FROM users
 WHERE id = ?
 `
@@ -27,6 +28,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id string) (User, error) {
 		&i.Name,
 		&i.Username,
 		&i.HashedPassword,
+		&i.FriendCode,
 	)
 	return i, err
 }

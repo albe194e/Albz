@@ -10,11 +10,17 @@ SELECT *
 FROM conversations
 WHERE id = ?;
 
--- name: CreateConversation :exec
+-- name: CreateConversation :one
 INSERT INTO conversations (id, name)
-VALUES (?, ?);
+VALUES (?, ?)
+RETURNING *;
 
 -- name: AddParticipant :exec
 INSERT INTO conversation_participants (conversation_id, participant_id)
 VALUES (?, ?);
+
+-- name: ListConversationParticipantIDs :many
+SELECT participant_id
+FROM conversation_participants
+WHERE conversation_id = ?;
 

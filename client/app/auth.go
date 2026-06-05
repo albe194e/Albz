@@ -5,6 +5,7 @@ import (
 	dsql "database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/albe194e/albz/client/db/sqlc/sql"
@@ -17,6 +18,7 @@ func (c *Controller) Register(ctx context.Context, name, username, password stri
 		Username:       username,
 		Name:           name,
 		HashedPassword: password,
+		FriendCode:     newFriendCode(),
 	}
 
 	err := c.Store.Q.CreateUser(ctx, createUserParams)
@@ -50,7 +52,16 @@ func (c *Controller) Login(ctx context.Context, username, password string) error
 		return err
 	}
 
+	if err := c.ConnectToServer(ctx); err != nil {
+		fmt.Printf("failed to connect to server: %v\n", err)
+	}
+
 	return nil
+}
+
+func newFriendCode() string {
+	value := strings.ToUpper(strings.ReplaceAll(uuid.NewString(), "-", ""))
+	return "ALBZ-" + value[:12]
 }
 
 func (c *Controller) CreateOrUpdateSession(ctx context.Context, userID string) (string, error) {
@@ -105,6 +116,9 @@ func (c *Controller) VerifySession(ctx context.Context) error {
 	if err != nil {
 		fmt.Printf("failed to initialize state: %v\n", err)
 		return err
+	}
+	if err := c.ConnectToServer(ctx); err != nil {
+		fmt.Printf("failed to connect to server: %v\n", err)
 	}
 	return nil
 }

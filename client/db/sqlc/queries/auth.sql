@@ -3,9 +3,10 @@ INSERT INTO users (
 	id,
 	name,
 	username,
-	hashed_password
+	hashed_password,
+	friend_code
 ) VALUES (
-	?, ?, ?, ?
+	?, ?, ?, ?, ?
 );
 
 -- name: GetUserByUsername :one
@@ -13,7 +14,8 @@ SELECT
   id,
   name,
   username,
-  hashed_password
+  hashed_password,
+  friend_code
 FROM users
 WHERE username = ?;
 

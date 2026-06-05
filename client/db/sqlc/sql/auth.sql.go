@@ -14,9 +14,10 @@ INSERT INTO users (
 	id,
 	name,
 	username,
-	hashed_password
+	hashed_password,
+	friend_code
 ) VALUES (
-	?, ?, ?, ?
+	?, ?, ?, ?, ?
 )
 `
 
@@ -25,6 +26,7 @@ type CreateUserParams struct {
 	Name           string `db:"name" json:"name"`
 	Username       string `db:"username" json:"username"`
 	HashedPassword string `db:"hashed_password" json:"hashed_password"`
+	FriendCode     string `db:"friend_code" json:"friend_code"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
@@ -33,6 +35,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 		arg.Name,
 		arg.Username,
 		arg.HashedPassword,
+		arg.FriendCode,
 	)
 	return err
 }
@@ -76,7 +79,8 @@ SELECT
   id,
   name,
   username,
-  hashed_password
+  hashed_password,
+  friend_code
 FROM users
 WHERE username = ?
 `
@@ -89,6 +93,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Name,
 		&i.Username,
 		&i.HashedPassword,
+		&i.FriendCode,
 	)
 	return i, err
 }

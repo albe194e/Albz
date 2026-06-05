@@ -24,9 +24,10 @@ func (q *Queries) AddParticipant(ctx context.Context, arg AddParticipantParams) 
 	return err
 }
 
-const createConversation = `-- name: CreateConversation :exec
+const createConversation = `-- name: CreateConversation :one
 INSERT INTO conversations (id, name)
 VALUES (?, ?)
+RETURNING id, name
 `
 
 type CreateConversationParams struct {
@@ -34,9 +35,11 @@ type CreateConversationParams struct {
 	Name string `db:"name" json:"name"`
 }
 
-func (q *Queries) CreateConversation(ctx context.Context, arg CreateConversationParams) error {
-	_, err := q.db.ExecContext(ctx, createConversation, arg.ID, arg.Name)
-	return err
+func (q *Queries) CreateConversation(ctx context.Context, arg CreateConversationParams) (Conversation, error) {
+	row := q.db.QueryRowContext(ctx, createConversation, arg.ID, arg.Name)
+	var i Conversation
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
 }
 
 const getConversationByID = `-- name: GetConversationByID :one
@@ -73,6 +76,35 @@ func (q *Queries) GetConversationsByUserID(ctx context.Context, participantID st
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listConversationParticipantIDs = `-- name: ListConversationParticipantIDs :many
+SELECT participant_id
+FROM conversation_participants
+WHERE conversation_id = ?
+`
+
+func (q *Queries) ListConversationParticipantIDs(ctx context.Context, conversationID string) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listConversationParticipantIDs, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var participantID string
+		if err := rows.Scan(&participantID); err != nil {
+			return nil, err
+		}
+		items = append(items, participantID)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
