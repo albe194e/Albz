@@ -89,7 +89,7 @@ func appStorageRootPath(app fyne.App) (string, error) {
 func serverURL() string {
 	value := strings.TrimSpace(os.Getenv("ALBZ_SERVER_WS_URL"))
 	if value == "" {
-		return "wss://fcb6-217-71-2-188.ngrok-free.app/ws"
+		return "ws://localhost:8080/ws"
 	}
 
 	return value
