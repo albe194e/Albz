@@ -44,14 +44,7 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) er
 }
 
 const getMessage = `-- name: GetMessage :one
-SELECT
-  id,
-  conversation_id,
-  sender_id,
-  client_message_id,
-  body,
-  created_at,
-  delivery_state
+SELECT id, conversation_id, sender_id, client_message_id, body, created_at, delivery_state
 FROM messages
 WHERE id = ?
 `
@@ -72,15 +65,9 @@ func (q *Queries) GetMessage(ctx context.Context, id int64) (Message, error) {
 }
 
 const getMessages = `-- name: GetMessages :many
-SELECT
-  id,
-  conversation_id,
-  sender_id,
-  client_message_id,
-  body,
-  created_at,
-  delivery_state
+SELECT id, conversation_id, sender_id, client_message_id, body, created_at, delivery_state
 FROM messages
+ORDER BY created_at ASC
 `
 
 func (q *Queries) GetMessages(ctx context.Context) ([]Message, error) {
@@ -115,14 +102,7 @@ func (q *Queries) GetMessages(ctx context.Context) ([]Message, error) {
 }
 
 const listMessagesByConversation = `-- name: ListMessagesByConversation :many
-SELECT
-  id,
-  conversation_id,
-  sender_id,
-  client_message_id,
-  body,
-  created_at,
-  delivery_state
+SELECT id, conversation_id, sender_id, client_message_id, body, created_at, delivery_state
 FROM messages
 WHERE conversation_id = ?
 ORDER BY created_at ASC

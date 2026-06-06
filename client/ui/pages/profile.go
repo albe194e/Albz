@@ -6,6 +6,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 
 	app "github.com/albe194e/albz/client/app"
 	ui "github.com/albe194e/albz/client/ui"
@@ -147,7 +148,15 @@ func ProfilePage(router *ui.Router) fyne.CanvasObject {
 		errorLabel.SetText("Network: " + router.Controller.State.LastNetworkError)
 	}
 
-	header := container.NewBorder(nil, nil, backBtn, nil, titleLabel)
+	headerContent := container.NewBorder(nil, nil, backBtn, nil, titleLabel)
+	footerContent := container.NewBorder(
+		nil,
+		nil,
+		nil,
+		base.ButtonLogout(router),
+		nil,
+	)
+
 	shareCard := base.Card(container.NewVBox(
 		base.Text("Share this code so another person can add you.", base.TextStyle{
 			Color: ui.CurrentTheme.SecondaryText,
@@ -158,11 +167,37 @@ func ProfilePage(router *ui.Router) fyne.CanvasObject {
 	))
 
 	content := container.NewVBox(
-		header,
 		shareCard,
 		base.Section("Pending Requests", container.NewVBox(requestCards...)),
 		base.Section("Friends", container.NewVBox(friendCards...)),
 	)
 
-	return base.Centered(content, 24)
+	outerMargin := float32(24)
+	panelRadius := float32(18)
+	if router.IsMobileLayout() {
+		outerMargin = 10
+		panelRadius = 0
+	}
+
+	panel := base.PanelWithHeaderFooter(
+		container.NewVScroll(content),
+		base.PanelStyle{
+			Fill:   ui.CurrentTheme.PanelFill,
+			Stroke: ui.CurrentTheme.PanelStroke,
+			Radius: panelRadius,
+			Padding: &base.Padding{
+				Top:    16,
+				Bottom: 16,
+				Left:   18,
+				Right:  18,
+			},
+		},
+		container.NewVBox(headerContent, base.Seperator(nil)),
+		container.NewVBox(base.Seperator(nil), footerContent),
+	)
+
+	return container.New(
+		layout.NewCustomPaddedLayout(outerMargin, outerMargin, outerMargin, outerMargin),
+		panel,
+	)
 }

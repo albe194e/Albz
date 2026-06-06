@@ -9,6 +9,12 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
+const (
+	H1Size = 22
+	H2Size = 18
+	H3Size = 16
+)
+
 type TextStyle struct {
 	Size  float32
 	Color color.Color
@@ -17,19 +23,23 @@ type TextStyle struct {
 
 // Outgoing API methods
 func H1(text string, style TextStyle) *TextWidget {
-	return NewText(text, resolveTextSize(style.Size, 22), style.Color, fyne.TextStyle{Bold: style.Bold})
+	return NewText(text, resolveTextSize(style.Size, H1Size), style.Color, fyne.TextStyle{Bold: style.Bold})
 }
 
 func H1Binding(text binding.String, style TextStyle) *TextWidget {
-	return NewTextWithBinding(text, resolveTextSize(style.Size, 22), style.Color, fyne.TextStyle{Bold: style.Bold})
+	return NewTextWithBinding(text, resolveTextSize(style.Size, H1Size), style.Color, fyne.TextStyle{Bold: style.Bold})
 }
 
 func H2(text string, style TextStyle) *TextWidget {
-	return NewText(text, resolveTextSize(style.Size, 18), style.Color, fyne.TextStyle{Bold: style.Bold})
+	return NewText(text, resolveTextSize(style.Size, H2Size), style.Color, fyne.TextStyle{Bold: style.Bold})
+}
+
+func H2Binding(text binding.String, style TextStyle) *TextWidget {
+	return NewTextWithBinding(text, resolveTextSize(style.Size, H2Size), style.Color, fyne.TextStyle{Bold: style.Bold})
 }
 
 func H3(text string, style TextStyle) *TextWidget {
-	return NewText(text, resolveTextSize(style.Size, 16), style.Color, fyne.TextStyle{Bold: style.Bold})
+	return NewText(text, resolveTextSize(style.Size, H3Size), style.Color, fyne.TextStyle{Bold: style.Bold})
 }
 
 // General text component with customizable style

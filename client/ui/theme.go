@@ -4,9 +4,15 @@ import "image/color"
 
 type Theme struct {
 	AppBackground  color.NRGBA
+	GradientStart  color.NRGBA
+	GradientMid    color.NRGBA
+	GradientEnd    color.NRGBA
+	AppShellFill   color.NRGBA
+	AppShellStroke color.NRGBA
 	Surface        color.NRGBA
 	ElevatedCard   color.NRGBA
 	Border         color.NRGBA
+	Divider        color.NRGBA
 	PrimaryText    color.NRGBA
 	SecondaryText  color.NRGBA
 	MutedText      color.NRGBA
@@ -27,25 +33,31 @@ type Theme struct {
 var CurrentTheme = DefaultTheme
 
 var DefaultTheme = Theme{
-	AppBackground:  color.NRGBA{R: 12, G: 14, B: 17, A: 255},
-	Surface:        color.NRGBA{R: 22, G: 26, B: 31, A: 255},
-	ElevatedCard:   color.NRGBA{R: 29, G: 34, B: 40, A: 255},
-	Border:         color.NRGBA{R: 52, G: 60, B: 70, A: 255},
-	PrimaryText:    color.NRGBA{R: 236, G: 234, B: 229, A: 255},
-	SecondaryText:  color.NRGBA{R: 176, G: 184, B: 190, A: 255},
-	MutedText:      color.NRGBA{R: 118, G: 127, B: 136, A: 255},
-	PrimaryAccent:  color.NRGBA{R: 68, G: 92, B: 98, A: 255},
-	AccentHover:    color.NRGBA{R: 84, G: 112, B: 119, A: 255},
-	SuccessOnline:  color.NRGBA{R: 101, G: 164, B: 131, A: 255},
-	WarningDelayed: color.NRGBA{R: 184, G: 148, B: 88, A: 255},
-	ErrorFailed:    color.NRGBA{R: 176, G: 100, B: 100, A: 255},
+	AppBackground:  color.NRGBA{R: 30, G: 34, B: 41, A: 255},
+	GradientStart:  color.NRGBA{R: 30, G: 34, B: 41, A: 255},
+	GradientMid:    color.NRGBA{R: 30, G: 34, B: 41, A: 255},
+	GradientEnd:    color.NRGBA{R: 30, G: 34, B: 41, A: 255},
+	AppShellFill:   color.NRGBA{A: 0},
+	AppShellStroke: color.NRGBA{R: 102, G: 120, B: 164, A: 72},
+	Surface:        color.NRGBA{R: 28, G: 35, B: 50, A: 238},
+	ElevatedCard:   color.NRGBA{R: 35, G: 43, B: 60, A: 236},
+	Border:         color.NRGBA{R: 102, G: 120, B: 164, A: 84},
+	Divider:        color.NRGBA{R: 102, G: 120, B: 164, A: 28},
+	PrimaryText:    color.NRGBA{R: 239, G: 242, B: 248, A: 255},
+	SecondaryText:  color.NRGBA{R: 168, G: 179, B: 202, A: 255},
+	MutedText:      color.NRGBA{R: 118, G: 128, B: 150, A: 255},
+	PrimaryAccent:  color.NRGBA{R: 92, G: 117, B: 214, A: 255},
+	AccentHover:    color.NRGBA{R: 122, G: 146, B: 232, A: 255},
+	SuccessOnline:  color.NRGBA{R: 143, G: 224, B: 193, A: 255},
+	WarningDelayed: color.NRGBA{R: 246, G: 203, B: 121, A: 255},
+	ErrorFailed:    color.NRGBA{R: 234, G: 138, B: 154, A: 255},
 
-	SidebarFill:            color.NRGBA{R: 16, G: 19, B: 23, A: 255},
-	SidebarStroke:          color.NRGBA{R: 45, G: 52, B: 61, A: 255},
-	PanelFill:              color.NRGBA{R: 25, G: 29, B: 35, A: 255},
-	PanelStroke:            color.NRGBA{R: 53, G: 61, B: 71, A: 255},
-	ConversationCardFill:   color.NRGBA{R: 31, G: 36, B: 43, A: 255},
-	ConversationCardStroke: color.NRGBA{R: 66, G: 75, B: 86, A: 255},
+	SidebarFill:            color.NRGBA{A: 0},
+	SidebarStroke:          color.NRGBA{A: 0},
+	PanelFill:              color.NRGBA{A: 0},
+	PanelStroke:            color.NRGBA{A: 0},
+	ConversationCardFill:   color.NRGBA{R: 39, G: 47, B: 65, A: 228},
+	ConversationCardStroke: color.NRGBA{A: 0},
 }
 
 const BtnRadius = 12

@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS users (
 	name TEXT NOT NULL,
 	username TEXT NOT NULL UNIQUE,
 	hashed_password TEXT NOT NULL,
+	profile_picture_url TEXT NOT NULL,
 	friend_code TEXT NOT NULL UNIQUE
 );
 
@@ -46,6 +47,7 @@ CREATE TABLE IF NOT EXISTS friends (
 	user_id VARCHAR(36) NOT NULL UNIQUE,
 	name TEXT NOT NULL,
 	username TEXT NOT NULL,
+	profile_picture_url TEXT NOT NULL,
 	friend_code TEXT NOT NULL,
 	created_at INTEGER NOT NULL
 );

@@ -3,16 +3,19 @@ package main
 import (
 	"context"
 	_ "embed"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"unicode"
 
 	fyne "fyne.io/fyne/v2"
 	fyneapp "fyne.io/fyne/v2/app"
 
 	clientapp "github.com/albe194e/albz/client/app"
+	"github.com/albe194e/albz/client/app/file"
 	"github.com/albe194e/albz/client/db/storage"
 	"github.com/albe194e/albz/client/network"
 	"github.com/albe194e/albz/client/ui"
@@ -26,17 +29,14 @@ func main() {
 	fmt.Println("starting Albz")
 	fyneApp := fyneapp.New()
 
-	dbPath := filepath.Join("db", "local_storage", "albz.db")
-	if runtime.GOOS == "android" {
-		rootPath, err := appStorageRootPath(fyneApp)
-		if err != nil {
-			fmt.Printf("failed to resolve app storage root: %v\n", err)
-			return
-		}
-		dbPath = filepath.Join(rootPath, "db", "local_storage", "albz.db")
+	runtimeConfig, err := loadRuntimeConfig(fyneApp, os.Args[1:])
+	if err != nil {
+		fmt.Printf("failed to load runtime config: %v\n", err)
+		return
 	}
+	fmt.Printf("using client database: %s\n", runtimeConfig.dbPath)
 
-	store, err := storage.OpenSQLite(context.Background(), dbPath, schemaSQL)
+	store, err := storage.OpenSQLite(context.Background(), runtimeConfig.dbPath, schemaSQL)
 	if err != nil {
 		fmt.Printf("failed to open SQLite database: %v\n", err)
 		return
@@ -47,9 +47,15 @@ func main() {
 		}
 	}()
 	appState := &clientapp.AppState{}
+	fileHandler, err := file.NewHandler(filepath.Dir(runtimeConfig.dbPath))
+	if err != nil {
+		fmt.Printf("failed to create file handler: %v\n", err)
+		return
+	}
 	controller := &clientapp.Controller{
-		State: appState,
-		Store: store,
+		State:       appState,
+		Store:       store,
+		FileHandler: fileHandler,
 	}
 	controller.Net = network.NewClient(serverURL(), network.Handlers{
 		OnConversationCreated:   controller.HandleConversationCreated,
@@ -65,7 +71,92 @@ func main() {
 	uiState := &ui.UIState{}
 	uiState.Init()
 
-	ui.Run(fyneApp, controller, uiState)
+	ui.Run(fyneApp, controller, uiState, runtimeConfig.windowTitle)
+}
+
+type runtimeConfig struct {
+	profileName string
+	dbPath      string
+	windowTitle string
+}
+
+func loadRuntimeConfig(app fyne.App, args []string) (runtimeConfig, error) {
+	config := runtimeConfig{
+		dbPath:      filepath.Join("dev-local-db", "local_storage", "albz.db"),
+		windowTitle: "Albz",
+	}
+
+	flags := flag.NewFlagSet("albz-client", flag.ContinueOnError)
+	profileFlag := flags.String("profile", "", "named desktop client profile")
+	dataDirFlag := flags.String("data-dir", "", "custom directory for local client data")
+
+	if err := flags.Parse(args); err != nil {
+		return runtimeConfig{}, fmt.Errorf("parse flags: %w", err)
+	}
+
+	profileName := strings.TrimSpace(*profileFlag)
+	if profileName == "" {
+		profileName = strings.TrimSpace(os.Getenv("ALBZ_CLIENT_PROFILE"))
+	}
+
+	dataDir := strings.TrimSpace(*dataDirFlag)
+	if dataDir == "" {
+		dataDir = strings.TrimSpace(os.Getenv("ALBZ_CLIENT_DATA_DIR"))
+	}
+
+	if profileName != "" && dataDir != "" {
+		return runtimeConfig{}, fmt.Errorf("use either profile or data-dir, not both")
+	}
+
+	if dataDir != "" {
+		config.dbPath = filepath.Join(dataDir, "albz.db")
+		return config, nil
+	}
+
+	if runtime.GOOS == "android" {
+		rootPath, err := appStorageRootPath(app)
+		if err != nil {
+			return runtimeConfig{}, fmt.Errorf("resolve app storage root: %w", err)
+		}
+		config.dbPath = filepath.Join(rootPath, "dev-local-db", "local_storage", "albz.db")
+		return config, nil
+	}
+
+	if profileName == "" {
+		return config, nil
+	}
+
+	normalizedProfile, err := normalizeProfileName(profileName)
+	if err != nil {
+		return runtimeConfig{}, err
+	}
+
+	config.profileName = normalizedProfile
+	config.dbPath = filepath.Join("dev-local-db", "local_storage", "profiles", normalizedProfile, "albz.db")
+	config.windowTitle = fmt.Sprintf("Albz (%s)", normalizedProfile)
+
+	return config, nil
+}
+
+func normalizeProfileName(value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "", fmt.Errorf("profile name is required")
+	}
+
+	for _, char := range trimmed {
+		if unicode.IsLetter(char) || unicode.IsDigit(char) {
+			continue
+		}
+		switch char {
+		case '-', '_', '.':
+			continue
+		default:
+			return "", fmt.Errorf("profile name %q contains unsupported character %q", trimmed, string(char))
+		}
+	}
+
+	return trimmed, nil
 }
 
 func appStorageRootPath(app fyne.App) (string, error) {

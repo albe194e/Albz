@@ -9,11 +9,16 @@ import (
 	clientapp "github.com/albe194e/albz/client/app"
 )
 
-func Run(a fyne.App, c *clientapp.Controller, uiState *UIState) {
-	w := a.NewWindow("Albz")
+func Run(a fyne.App, c *clientapp.Controller, uiState *UIState, windowTitle string) {
+	if windowTitle == "" {
+		windowTitle = "Albz"
+	}
+
+	w := a.NewWindow(windowTitle)
 	router := NewRouter(w, c, uiState)
 	c.OnStateChanged = func() {
 		fyne.Do(func() {
+			router.InvalidateAllPages()
 			router.NavigateTo(router.State.Page)
 		})
 	}
@@ -23,11 +28,11 @@ func Run(a fyne.App, c *clientapp.Controller, uiState *UIState) {
 		uiState.Page = Chat
 	}
 
-	router.NavigateTo(uiState.Page)
-
 	if runtime.GOOS != "android" {
 		w.Resize(fyne.NewSize(1120, 760))
 	}
+
+	router.NavigateTo(uiState.Page)
 	w.ShowAndRun()
 
 	_ = c

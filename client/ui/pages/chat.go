@@ -17,6 +17,11 @@ func init() {
 }
 
 func ChatPage(router *ui.Router) fyne.CanvasObject {
+	outerMargin := float32(14)
+	if router.IsMobileLayout() {
+		outerMargin = 10
+	}
+
 	chatBody := container.NewBorder(
 		nil,
 		chat.MessageInputPanel(router),
@@ -32,21 +37,35 @@ func ChatPage(router *ui.Router) fyne.CanvasObject {
 			mobileSidebarOverlay(router),
 		)
 	} else if !router.IsMobileLayout() {
-		body = container.NewBorder(
+		rightColumn := container.NewBorder(
+			chat.TopBar(router),
 			nil,
 			nil,
-			chat.ConversationListPanel(router),
 			nil,
 			chatBody,
 		)
+
+		return container.New(
+			layout.NewCustomPaddedLayout(outerMargin, outerMargin, outerMargin, outerMargin),
+			container.NewBorder(
+				nil,
+				nil,
+				chat.ConversationListPanel(router),
+				nil,
+				rightColumn,
+			),
+		)
 	}
 
-	return container.NewBorder(
-		chat.TopBar(router),
-		nil,
-		nil,
-		nil,
-		body,
+	return container.New(
+		layout.NewCustomPaddedLayout(outerMargin, outerMargin, outerMargin, outerMargin),
+		container.NewBorder(
+			chat.TopBar(router),
+			nil,
+			nil,
+			nil,
+			body,
+		),
 	)
 }
 

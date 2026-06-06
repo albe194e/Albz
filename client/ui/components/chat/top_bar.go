@@ -1,6 +1,8 @@
 package components
 
 import (
+	"image/color"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 
@@ -50,8 +52,8 @@ func TopBar(r *ui.Router) fyne.CanvasObject {
 	header := container.NewBorder(nil, nil, nil, right, chatName)
 
 	return base.Panel(header, base.PanelStyle{
-		Fill:    ui.CurrentTheme.Surface,
-		Stroke:  ui.CurrentTheme.Border,
+		Fill:    color.NRGBA{A: 0},
+		Stroke:  ui.CurrentTheme.PanelStroke,
 		Radius:  18,
 		MinSize: fyne.NewSize(0, 64),
 		Padding: &base.Padding{

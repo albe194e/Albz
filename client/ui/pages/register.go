@@ -19,6 +19,24 @@ func RegisterPage(router *ui.Router) fyne.CanvasObject {
 	nameInput := base.TextField("Name", "Display name")
 	usernameInput := base.TextField("Username", "Choose a username")
 	passwordInput := base.PasswordField("Password")
+	profilePicturePath := ""
+	profilePictureUpload := base.ImageUploadField(router.Window, "Profile picture", func(data []byte, filename string) error {
+		if router == nil || router.Controller == nil || router.Controller.FileHandler == nil {
+			return fmt.Errorf("file handler is not configured")
+		}
+
+		savedPath, err := router.Controller.FileHandler.SaveImageToStorage(data, filename)
+		if err != nil {
+			return err
+		}
+
+		profilePicturePath = savedPath
+		return nil
+	})
+	errorLabel := base.Text("", base.TextStyle{
+		Size:  12,
+		Color: ui.CurrentTheme.WarningDelayed,
+	})
 
 	registerButton := base.Button("Create Account", func() {
 		if err := router.Controller.Register(
@@ -26,8 +44,9 @@ func RegisterPage(router *ui.Router) fyne.CanvasObject {
 			nameInput.Entry.Text,
 			usernameInput.Entry.Text,
 			passwordInput.Entry.Text,
+			profilePicturePath,
 		); err != nil {
-			fmt.Println("Register failed:", err)
+			errorLabel.SetText(err.Error())
 			return
 		}
 
@@ -53,6 +72,8 @@ func RegisterPage(router *ui.Router) fyne.CanvasObject {
 		nameInput.View,
 		usernameInput.View,
 		passwordInput.View,
+		profilePictureUpload.View,
+		errorLabel,
 		registerButton,
 		backButton,
 	)

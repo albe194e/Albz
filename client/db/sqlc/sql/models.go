@@ -16,12 +16,13 @@ type ConversationParticipant struct {
 }
 
 type Friend struct {
-	ID         int64  `db:"id" json:"id"`
-	UserID     string `db:"user_id" json:"user_id"`
-	Name       string `db:"name" json:"name"`
-	Username   string `db:"username" json:"username"`
-	FriendCode string `db:"friend_code" json:"friend_code"`
-	CreatedAt  int64  `db:"created_at" json:"created_at"`
+	ID                int64  `db:"id" json:"id"`
+	UserID            string `db:"user_id" json:"user_id"`
+	Name              string `db:"name" json:"name"`
+	Username          string `db:"username" json:"username"`
+	ProfilePictureUrl string `db:"profile_picture_url" json:"profile_picture_url"`
+	FriendCode        string `db:"friend_code" json:"friend_code"`
+	CreatedAt         int64  `db:"created_at" json:"created_at"`
 }
 
 type FriendRequest struct {
@@ -52,9 +53,10 @@ type Session struct {
 }
 
 type User struct {
-	ID             string `db:"id" json:"id"`
-	Name           string `db:"name" json:"name"`
-	Username       string `db:"username" json:"username"`
-	HashedPassword string `db:"hashed_password" json:"hashed_password"`
-	FriendCode     string `db:"friend_code" json:"friend_code"`
+	ID                string `db:"id" json:"id"`
+	Name              string `db:"name" json:"name"`
+	Username          string `db:"username" json:"username"`
+	HashedPassword    string `db:"hashed_password" json:"hashed_password"`
+	ProfilePictureUrl string `db:"profile_picture_url" json:"profile_picture_url"`
+	FriendCode        string `db:"friend_code" json:"friend_code"`
 }

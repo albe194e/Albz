@@ -11,37 +11,17 @@ INSERT INTO messages (
 );
 
 -- name: GetMessage :one
-SELECT
-  id,
-  conversation_id,
-  sender_id,
-  client_message_id,
-  body,
-  created_at,
-  delivery_state
+SELECT *
 FROM messages
 WHERE id = ?;
 
 -- name: GetMessages :many
-SELECT
-  id,
-  conversation_id,
-  sender_id,
-  client_message_id,
-  body,
-  created_at,
-  delivery_state
-FROM messages;
+SELECT *
+FROM messages
+ORDER BY created_at ASC;
 
 -- name: ListMessagesByConversation :many
-SELECT
-  id,
-  conversation_id,
-  sender_id,
-  client_message_id,
-  body,
-  created_at,
-  delivery_state
+SELECT *
 FROM messages
 WHERE conversation_id = ?
 ORDER BY created_at ASC;

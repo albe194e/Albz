@@ -100,11 +100,11 @@ func (q *Queries) ListConversationParticipantIDs(ctx context.Context, conversati
 	defer rows.Close()
 	items := []string{}
 	for rows.Next() {
-		var participantID string
-		if err := rows.Scan(&participantID); err != nil {
+		var participant_id string
+		if err := rows.Scan(&participant_id); err != nil {
 			return nil, err
 		}
-		items = append(items, participantID)
+		items = append(items, participant_id)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

@@ -20,13 +20,7 @@ func (q *Queries) DeleteFriendRequestByFromUserID(ctx context.Context, fromUserI
 }
 
 const listFriendRequests = `-- name: ListFriendRequests :many
-SELECT
-  id,
-  from_user_id,
-  name,
-  username,
-  from_friend_code,
-  created_at
+SELECT id, from_user_id, name, username, from_friend_code, created_at
 FROM friend_requests
 ORDER BY created_at ASC
 `
@@ -87,6 +81,12 @@ type UpsertFriendRequestParams struct {
 }
 
 func (q *Queries) UpsertFriendRequest(ctx context.Context, arg UpsertFriendRequestParams) error {
-	_, err := q.db.ExecContext(ctx, upsertFriendRequest, arg.FromUserID, arg.Name, arg.Username, arg.FromFriendCode, arg.CreatedAt)
+	_, err := q.db.ExecContext(ctx, upsertFriendRequest,
+		arg.FromUserID,
+		arg.Name,
+		arg.Username,
+		arg.FromFriendCode,
+		arg.CreatedAt,
+	)
 	return err
 }

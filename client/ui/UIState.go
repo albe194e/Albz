@@ -23,5 +23,6 @@ func (s *UIState) Init() {
 	s.Page = Landing
 	s.ActiveConversationID = ""
 	s.ActiveConversationName = binding.NewString()
+	_ = s.ActiveConversationName.Set("Choose a conversation")
 	s.SidebarOpen = false
 }

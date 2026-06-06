@@ -5,6 +5,7 @@ import (
 	dsql "database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/albe194e/albz/client/db/sqlc/sql"
@@ -17,11 +18,44 @@ func (c *Controller) GetConversationsByMe(ctx context.Context) ([]sql.Conversati
 }
 
 func (c *Controller) CreateConversation(ctx context.Context, name string) error {
+	conversationName := strings.TrimSpace(name)
+	if conversationName == "" {
+		conversationName = "New Conversation"
+	}
+
 	params := sql.CreateConversationParams{
 		ID:   uuid.New().String()[:16],
-		Name: name,
+		Name: conversationName,
 	}
-	_, err := c.ensureConversationRecord(ctx, params.ID, name, c.State.CurrentUser.ID)
+	_, err := c.ensureConversationRecord(ctx, params.ID, conversationName, c.State.CurrentUser.ID)
+	return err
+}
+
+func (c *Controller) CreateConversationWithUsers(ctx context.Context, name string, userIDs ...string) error {
+	if c == nil || c.State == nil || c.State.CurrentUser == nil {
+		return fmt.Errorf("no current user")
+	}
+
+	participantUserIDs, recipientUserIDs, err := c.normalizeConversationParticipantIDs(userIDs...)
+	if err != nil {
+		return err
+	}
+
+	conversationName := strings.TrimSpace(name)
+	if conversationName == "" {
+		conversationName = c.conversationDisplayName("", participantUserIDs)
+	}
+
+	params := sql.CreateConversationParams{
+		ID:   uuid.New().String()[:16],
+		Name: conversationName,
+	}
+	_, err = c.ensureConversationRecord(ctx, params.ID, conversationName, participantUserIDs...)
+	if err != nil {
+		return err
+	}
+
+	c.broadcastConversationCreated(recipientUserIDs, params.ID, strings.TrimSpace(name))
 	return err
 }
 
@@ -38,32 +72,7 @@ func (c *Controller) CreateConversationWithFriend(ctx context.Context, friend sq
 		return *existing, nil
 	}
 
-	conversationID := uuid.New().String()[:16]
-	conversation, err := c.ensureConversationRecord(ctx, conversationID, FriendDisplayName(friend), c.State.CurrentUser.ID, friend.UserID)
-	if err != nil {
-		return sql.Conversation{}, err
-	}
-
-	if c.Net != nil {
-		if !c.State.ServerConnected {
-			if err := c.ConnectToServer(ctx); err != nil {
-				c.State.LastNetworkError = err.Error()
-				c.notifyStateChanged()
-				return conversation, nil
-			}
-		}
-
-		if err := c.Net.CreateConversation(uuid.NewString(), protocol.ConversationCreatePayload{
-			ConversationID: conversationID,
-			ToUserID:       friend.UserID,
-		}); err != nil {
-			c.State.LastNetworkError = err.Error()
-			c.notifyStateChanged()
-			return conversation, nil
-		}
-	}
-
-	return conversation, nil
+	return c.CreateConversationWithFriends(ctx, "", friend)
 }
 
 func (c *Controller) HandleConversationCreated(event protocol.Envelope[protocol.ConversationCreatedPayload]) {
@@ -71,12 +80,17 @@ func (c *Controller) HandleConversationCreated(event protocol.Envelope[protocol.
 		return
 	}
 
+	participantUserIDs := event.Payload.ParticipantUserIDs
+	if len(participantUserIDs) == 0 {
+		participantUserIDs = []string{c.State.CurrentUser.ID, event.Payload.FromUserID}
+	}
+
+	conversationName := c.conversationDisplayName(event.Payload.ConversationName, participantUserIDs)
 	if _, err := c.ensureConversationRecord(
 		context.Background(),
 		event.Payload.ConversationID,
-		c.displayNameForConversationCreator(event.Payload.FromUserID, event.Payload.FromFriendCode),
-		c.State.CurrentUser.ID,
-		event.Payload.FromUserID,
+		conversationName,
+		participantUserIDs...,
 	); err != nil {
 		c.State.LastNetworkError = fmt.Sprintf("store incoming conversation: %v", err)
 		c.notifyStateChanged()
@@ -84,6 +98,35 @@ func (c *Controller) HandleConversationCreated(event protocol.Envelope[protocol.
 	}
 
 	c.notifyStateChanged()
+}
+
+func (c *Controller) CreateConversationWithFriends(ctx context.Context, name string, friends ...sql.Friend) (sql.Conversation, error) {
+	if c == nil || c.State == nil || c.State.CurrentUser == nil {
+		return sql.Conversation{}, fmt.Errorf("no current user")
+	}
+	if len(friends) == 0 {
+		return sql.Conversation{}, fmt.Errorf("at least one friend is required")
+	}
+
+	userIDs := make([]string, 0, len(friends))
+	for _, friend := range friends {
+		userIDs = append(userIDs, friend.UserID)
+	}
+
+	participantUserIDs, recipientUserIDs, err := c.normalizeConversationParticipantIDs(userIDs...)
+	if err != nil {
+		return sql.Conversation{}, err
+	}
+
+	conversationName := c.conversationDisplayName(strings.TrimSpace(name), participantUserIDs)
+	conversationID := uuid.New().String()[:16]
+	conversation, err := c.ensureConversationRecord(ctx, conversationID, conversationName, participantUserIDs...)
+	if err != nil {
+		return sql.Conversation{}, err
+	}
+
+	c.broadcastConversationCreated(recipientUserIDs, conversationID, strings.TrimSpace(name))
+	return conversation, nil
 }
 
 func (c *Controller) displayNameForConversationCreator(userID string, fallback string) string {
@@ -97,6 +140,99 @@ func (c *Controller) displayNameForConversationCreator(userID string, fallback s
 	}
 
 	return userID
+}
+
+func (c *Controller) conversationDisplayName(customName string, participantUserIDs []string) string {
+	if trimmed := strings.TrimSpace(customName); trimmed != "" {
+		return trimmed
+	}
+
+	otherNames := make([]string, 0, len(participantUserIDs))
+	currentUserID := ""
+	if c != nil && c.State != nil && c.State.CurrentUser != nil {
+		currentUserID = c.State.CurrentUser.ID
+	}
+
+	seen := make(map[string]struct{}, len(participantUserIDs))
+	for _, participantUserID := range participantUserIDs {
+		trimmed := strings.TrimSpace(participantUserID)
+		if trimmed == "" || trimmed == currentUserID {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+
+		seen[trimmed] = struct{}{}
+		otherNames = append(otherNames, c.displayNameForConversationCreator(trimmed, trimmed))
+	}
+
+	switch len(otherNames) {
+	case 0:
+		return "New Conversation"
+	case 1:
+		return otherNames[0]
+	case 2:
+		return fmt.Sprintf("%s, %s", otherNames[0], otherNames[1])
+	default:
+		return fmt.Sprintf("%s, %s +%d", otherNames[0], otherNames[1], len(otherNames)-2)
+	}
+}
+
+func (c *Controller) normalizeConversationParticipantIDs(userIDs ...string) ([]string, []string, error) {
+	if c == nil || c.State == nil || c.State.CurrentUser == nil {
+		return nil, nil, fmt.Errorf("no current user")
+	}
+
+	participantUserIDs := []string{c.State.CurrentUser.ID}
+	recipientUserIDs := make([]string, 0, len(userIDs))
+	seen := map[string]struct{}{
+		c.State.CurrentUser.ID: {},
+	}
+
+	for _, userID := range userIDs {
+		trimmed := strings.TrimSpace(userID)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+
+		seen[trimmed] = struct{}{}
+		participantUserIDs = append(participantUserIDs, trimmed)
+		recipientUserIDs = append(recipientUserIDs, trimmed)
+	}
+
+	if len(recipientUserIDs) == 0 {
+		return nil, nil, fmt.Errorf("at least one other participant is required")
+	}
+
+	slices.Sort(recipientUserIDs)
+	return participantUserIDs, recipientUserIDs, nil
+}
+
+func (c *Controller) broadcastConversationCreated(recipientUserIDs []string, conversationID string, customName string) {
+	if c == nil || c.Net == nil || c.State == nil {
+		return
+	}
+
+	if !c.State.ServerConnected {
+		if err := c.ConnectToServer(context.Background()); err != nil {
+			c.State.LastNetworkError = err.Error()
+			c.notifyStateChanged()
+			return
+		}
+	}
+
+	if err := c.Net.CreateConversation(uuid.NewString(), protocol.ConversationCreatePayload{
+		ConversationID:   conversationID,
+		ConversationName: customName,
+		ToUserIDs:        recipientUserIDs,
+	}); err != nil {
+		c.State.LastNetworkError = err.Error()
+		c.notifyStateChanged()
+	}
 }
 
 func (c *Controller) ensureConversationRecord(ctx context.Context, conversationID string, name string, participantIDs ...string) (sql.Conversation, error) {

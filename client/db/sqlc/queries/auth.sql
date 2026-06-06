@@ -4,18 +4,14 @@ INSERT INTO users (
 	name,
 	username,
 	hashed_password,
+	profile_picture_url,
 	friend_code
 ) VALUES (
-	?, ?, ?, ?, ?
+	?, ?, ?, ?, ?, ?
 );
 
 -- name: GetUserByUsername :one
-SELECT
-  id,
-  name,
-  username,
-  hashed_password,
-  friend_code
+SELECT *
 FROM users
 WHERE username = ?;
 
@@ -40,11 +36,6 @@ DELETE FROM sessions
 WHERE id = 1;
 
 -- name: GetCurrentSession :one
-SELECT
-	id,
-	session_id,
-	user_id,
-	created_at,
-	expires_at
+SELECT *
 FROM sessions
 WHERE id = 1;

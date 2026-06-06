@@ -40,14 +40,18 @@ func (c *Controller) HandleIncomingMessage(event protocol.Envelope[protocol.Mess
 			return
 		}
 
-		conversationName := c.displayNameForConversationCreator(event.Payload.FromUserID, "")
+		participantUserIDs := event.Payload.ParticipantUserIDs
+		if len(participantUserIDs) == 0 {
+			participantUserIDs = []string{c.State.CurrentUser.ID, event.Payload.FromUserID}
+		}
+
+		conversationName := c.conversationDisplayName("", participantUserIDs)
 
 		if _, err := c.ensureConversationRecord(
 			context.Background(),
 			event.Payload.ConversationID,
 			conversationName,
-			c.State.CurrentUser.ID,
-			event.Payload.FromUserID,
+			participantUserIDs...,
 		); err != nil {
 			c.State.LastNetworkError = fmt.Sprintf("create incoming conversation: %v", err)
 			c.notifyStateChanged()

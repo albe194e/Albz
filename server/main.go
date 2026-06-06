@@ -181,6 +181,22 @@ func (s *relayServer) getClientByUserID(userID string) *clientConn {
 	return s.clientsByUserID[userID]
 }
 
+func (s *relayServer) getClientsByUserIDs(userIDs []string) []*clientConn {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	clients := make([]*clientConn, 0, len(userIDs))
+	for _, userID := range userIDs {
+		client := s.clientsByUserID[userID]
+		if client == nil {
+			continue
+		}
+		clients = append(clients, client)
+	}
+
+	return clients
+}
+
 func (s *relayServer) getClientByFriendCode(friendCode string) *clientConn {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

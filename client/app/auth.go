@@ -12,13 +12,14 @@ import (
 	"github.com/google/uuid"
 )
 
-func (c *Controller) Register(ctx context.Context, name, username, password string) error {
+func (c *Controller) Register(ctx context.Context, name, username, password, profile_url string) error {
 	createUserParams := sql.CreateUserParams{
-		ID:             uuid.New().String(),
-		Username:       username,
-		Name:           name,
-		HashedPassword: password,
-		FriendCode:     newFriendCode(),
+		ID:                uuid.New().String(),
+		Username:          username,
+		Name:              name,
+		HashedPassword:    password,
+		ProfilePictureUrl: profile_url,
+		FriendCode:        newFriendCode(),
 	}
 
 	err := c.Store.Q.CreateUser(ctx, createUserParams)

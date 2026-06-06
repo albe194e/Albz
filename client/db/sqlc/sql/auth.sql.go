@@ -15,18 +15,20 @@ INSERT INTO users (
 	name,
 	username,
 	hashed_password,
+	profile_picture_url,
 	friend_code
 ) VALUES (
-	?, ?, ?, ?, ?
+	?, ?, ?, ?, ?, ?
 )
 `
 
 type CreateUserParams struct {
-	ID             string `db:"id" json:"id"`
-	Name           string `db:"name" json:"name"`
-	Username       string `db:"username" json:"username"`
-	HashedPassword string `db:"hashed_password" json:"hashed_password"`
-	FriendCode     string `db:"friend_code" json:"friend_code"`
+	ID                string `db:"id" json:"id"`
+	Name              string `db:"name" json:"name"`
+	Username          string `db:"username" json:"username"`
+	HashedPassword    string `db:"hashed_password" json:"hashed_password"`
+	ProfilePictureUrl string `db:"profile_picture_url" json:"profile_picture_url"`
+	FriendCode        string `db:"friend_code" json:"friend_code"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
@@ -35,6 +37,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 		arg.Name,
 		arg.Username,
 		arg.HashedPassword,
+		arg.ProfilePictureUrl,
 		arg.FriendCode,
 	)
 	return err
@@ -51,12 +54,7 @@ func (q *Queries) DeleteCurrentSession(ctx context.Context) error {
 }
 
 const getCurrentSession = `-- name: GetCurrentSession :one
-SELECT
-	id,
-	session_id,
-	user_id,
-	created_at,
-	expires_at
+SELECT id, session_id, user_id, created_at, expires_at
 FROM sessions
 WHERE id = 1
 `
@@ -75,12 +73,7 @@ func (q *Queries) GetCurrentSession(ctx context.Context) (Session, error) {
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT
-  id,
-  name,
-  username,
-  hashed_password,
-  friend_code
+SELECT id, name, username, hashed_password, profile_picture_url, friend_code
 FROM users
 WHERE username = ?
 `
@@ -93,6 +86,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Name,
 		&i.Username,
 		&i.HashedPassword,
+		&i.ProfilePictureUrl,
 		&i.FriendCode,
 	)
 	return i, err

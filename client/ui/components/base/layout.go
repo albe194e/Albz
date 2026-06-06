@@ -11,7 +11,7 @@ import (
 func Card(content fyne.CanvasObject) fyne.CanvasObject {
 	return Panel(content, PanelStyle{
 		Fill:   ui.CurrentTheme.ElevatedCard,
-		Stroke: ui.CurrentTheme.Border,
+		Stroke: ui.CurrentTheme.PanelStroke,
 		Radius: 18,
 		Padding: &Padding{
 			Top:    20,

@@ -15,13 +15,7 @@ ON CONFLICT(from_user_id) DO UPDATE SET
   created_at = excluded.created_at;
 
 -- name: ListFriendRequests :many
-SELECT
-  id,
-  from_user_id,
-  name,
-  username,
-  from_friend_code,
-  created_at
+SELECT *
 FROM friend_requests
 ORDER BY created_at ASC;
 

@@ -85,70 +85,73 @@ func migrateUsersTable(ctx context.Context, conn *sql.DB, schemaBytes []byte) er
 	if err != nil {
 		return err
 	}
-	if !needsMigration {
-		return nil
-	}
-
-	tx, err := conn.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin users migration tx: %w", err)
-	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
-
-	if _, err := tx.ExecContext(ctx, `DROP TABLE IF EXISTS users_legacy;`); err != nil {
-		return fmt.Errorf("drop stale legacy users table: %w", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, `ALTER TABLE users RENAME TO users_legacy;`); err != nil {
-		return fmt.Errorf("rename legacy users table: %w", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, string(schemaBytes)); err != nil {
-		return fmt.Errorf("create migrated users table: %w", err)
-	}
-
-	legacyColumns, err := tableColumnNames(ctx, tx, "users_legacy")
-	if err != nil {
-		return err
-	}
-
-	idExpr := "id"
-	if _, ok := legacyColumns["id"]; !ok {
-		if _, ok := legacyColumns["uuid"]; ok {
-			idExpr = "uuid"
-		} else {
-			return fmt.Errorf("legacy users table is missing both id and uuid columns")
+	if needsMigration {
+		tx, err := conn.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("begin users migration tx: %w", err)
 		}
-	}
+		defer func() {
+			_ = tx.Rollback()
+		}()
 
-	nameExpr := "name"
-	if _, ok := legacyColumns["name"]; !ok {
-		return fmt.Errorf("legacy users table is missing required column %q", "name")
-	}
+		if _, err := tx.ExecContext(ctx, `DROP TABLE IF EXISTS users_legacy;`); err != nil {
+			return fmt.Errorf("drop stale legacy users table: %w", err)
+		}
 
-	usernameExpr := "username"
-	if _, ok := legacyColumns["username"]; !ok {
-		usernameExpr = idExpr
-	}
+		if _, err := tx.ExecContext(ctx, `ALTER TABLE users RENAME TO users_legacy;`); err != nil {
+			return fmt.Errorf("rename legacy users table: %w", err)
+		}
 
-	hashedPasswordExpr := "hashed_password"
-	if _, ok := legacyColumns["hashed_password"]; !ok {
-		hashedPasswordExpr = "''"
-	}
+		if _, err := tx.ExecContext(ctx, string(schemaBytes)); err != nil {
+			return fmt.Errorf("create migrated users table: %w", err)
+		}
 
-	friendCodeExpr := "friend_code"
-	if _, ok := legacyColumns["friend_code"]; !ok {
-		friendCodeExpr = "'ALBZ-' || UPPER(HEX(RANDOMBLOB(6)))"
-	}
+		legacyColumns, err := tableColumnNames(ctx, tx, "users_legacy")
+		if err != nil {
+			return err
+		}
 
-	copyQuery := fmt.Sprintf(`
+		idExpr := "id"
+		if _, ok := legacyColumns["id"]; !ok {
+			if _, ok := legacyColumns["uuid"]; ok {
+				idExpr = "uuid"
+			} else {
+				return fmt.Errorf("legacy users table is missing both id and uuid columns")
+			}
+		}
+
+		nameExpr := "name"
+		if _, ok := legacyColumns["name"]; !ok {
+			return fmt.Errorf("legacy users table is missing required column %q", "name")
+		}
+
+		usernameExpr := "username"
+		if _, ok := legacyColumns["username"]; !ok {
+			usernameExpr = idExpr
+		}
+
+		hashedPasswordExpr := "hashed_password"
+		if _, ok := legacyColumns["hashed_password"]; !ok {
+			hashedPasswordExpr = "''"
+		}
+
+		friendCodeExpr := "friend_code"
+		if _, ok := legacyColumns["friend_code"]; !ok {
+			friendCodeExpr = "'ALBZ-' || UPPER(HEX(RANDOMBLOB(6)))"
+		}
+
+		profilePictureExpr := "profile_picture_url"
+		if _, ok := legacyColumns["profile_picture_url"]; !ok {
+			profilePictureExpr = "''"
+		}
+
+		copyQuery := fmt.Sprintf(`
 INSERT INTO users (
   id,
   name,
   username,
   hashed_password,
+  profile_picture_url,
   friend_code
 )
 SELECT
@@ -156,20 +159,33 @@ SELECT
   %s,
   %s,
   %s,
+  %s,
   %s
 FROM users_legacy;
-`, idExpr, nameExpr, usernameExpr, hashedPasswordExpr, friendCodeExpr)
+`, idExpr, nameExpr, usernameExpr, hashedPasswordExpr, profilePictureExpr, friendCodeExpr)
 
-	if _, err := tx.ExecContext(ctx, copyQuery); err != nil {
-		return fmt.Errorf("copy legacy users: %w", err)
+		if _, err := tx.ExecContext(ctx, copyQuery); err != nil {
+			return fmt.Errorf("copy legacy users: %w", err)
+		}
+
+		if _, err := tx.ExecContext(ctx, `DROP TABLE users_legacy;`); err != nil {
+			return fmt.Errorf("drop legacy users table: %w", err)
+		}
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit users migration: %w", err)
+		}
 	}
 
-	if _, err := tx.ExecContext(ctx, `DROP TABLE users_legacy;`); err != nil {
-		return fmt.Errorf("drop legacy users table: %w", err)
+	columnTypes, err := tableColumnTypes(ctx, conn, "users")
+	if err != nil {
+		return err
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit users migration: %w", err)
+	if _, ok := columnTypes["profile_picture_url"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE users ADD COLUMN profile_picture_url TEXT NOT NULL DEFAULT '';`); err != nil {
+			return fmt.Errorf("add users.profile_picture_url column: %w", err)
+		}
 	}
 
 	return nil
@@ -293,6 +309,12 @@ func migrateFriendsTable(ctx context.Context, conn *sql.DB) error {
 	if _, ok := columnTypes["username"]; !ok {
 		if _, err := conn.ExecContext(ctx, `ALTER TABLE friends ADD COLUMN username TEXT NOT NULL DEFAULT '';`); err != nil {
 			return fmt.Errorf("add friends.username column: %w", err)
+		}
+	}
+
+	if _, ok := columnTypes["profile_picture_url"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE friends ADD COLUMN profile_picture_url TEXT NOT NULL DEFAULT '';`); err != nil {
+			return fmt.Errorf("add friends.profile_picture_url column: %w", err)
 		}
 	}
 

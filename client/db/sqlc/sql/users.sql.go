@@ -10,12 +10,7 @@ import (
 )
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT
-	id,
-	name,
-	username,
-	hashed_password,
-	friend_code
+SELECT id, name, username, hashed_password, profile_picture_url, friend_code
 FROM users
 WHERE id = ?
 `
@@ -28,6 +23,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id string) (User, error) {
 		&i.Name,
 		&i.Username,
 		&i.HashedPassword,
+		&i.ProfilePictureUrl,
 		&i.FriendCode,
 	)
 	return i, err

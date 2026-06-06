@@ -33,7 +33,9 @@ func Panel(content fyne.CanvasObject, style PanelStyle) fyne.CanvasObject {
 
 	bg := canvas.NewRectangle(style.Fill)
 	bg.StrokeColor = style.Stroke
-	bg.StrokeWidth = 1
+	if hasVisibleStroke(style.Stroke) {
+		bg.StrokeWidth = 1
+	}
 	bg.CornerRadius = style.Radius
 	bg.SetMinSize(style.MinSize)
 
@@ -52,4 +54,46 @@ func Panel(content fyne.CanvasObject, style PanelStyle) fyne.CanvasObject {
 	}
 
 	return panel
+}
+
+func PanelWithHeaderFooter(content fyne.CanvasObject, style PanelStyle, headerContent, footerContent fyne.CanvasObject) fyne.CanvasObject {
+	mainContent := container.NewBorder(
+		headerContent,
+		footerContent,
+		nil,
+		nil,
+		content,
+	)
+	return Panel(mainContent, style)
+}
+
+func PanelWithHeader(content fyne.CanvasObject, style PanelStyle, headerContent fyne.CanvasObject) fyne.CanvasObject {
+	mainContent := container.NewBorder(
+		headerContent,
+		nil,
+		nil,
+		nil,
+		content,
+	)
+	return Panel(mainContent, style)
+}
+
+func PanelWithFooter(content fyne.CanvasObject, style PanelStyle, footerContent fyne.CanvasObject) fyne.CanvasObject {
+	mainContent := container.NewBorder(
+		nil,
+		footerContent,
+		nil,
+		nil,
+		content,
+	)
+	return Panel(mainContent, style)
+}
+
+func hasVisibleStroke(stroke color.Color) bool {
+	if stroke == nil {
+		return false
+	}
+
+	_, _, _, alpha := stroke.RGBA()
+	return alpha > 0
 }

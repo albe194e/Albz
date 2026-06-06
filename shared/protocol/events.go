@@ -35,20 +35,20 @@ type Envelope[T any] struct {
 }
 
 type MessageSendPayload struct {
-	ClientMessageID string `json:"client_message_id"`
-	ConversationID  string `json:"conversation_id"`
-	ToUserID        string `json:"to_user_id"`
-	Body            string `json:"body"`
-	SentAt          int64  `json:"sent_at"`
+	ClientMessageID string   `json:"client_message_id"`
+	ConversationID  string   `json:"conversation_id"`
+	ToUserIDs       []string `json:"to_user_ids"`
+	Body            string   `json:"body"`
+	SentAt          int64    `json:"sent_at"`
 }
 
 type MessageCreatedPayload struct {
-	MessageID      string `json:"message_id"`
-	ConversationID string `json:"conversation_id"`
-	FromUserID     string `json:"from_user_id"`
-	ToUserID       string `json:"to_user_id"`
-	Body           string `json:"body"`
-	SentAt         int64  `json:"sent_at"`
+	MessageID          string   `json:"message_id"`
+	ConversationID     string   `json:"conversation_id"`
+	FromUserID         string   `json:"from_user_id"`
+	ParticipantUserIDs []string `json:"participant_user_ids"`
+	Body               string   `json:"body"`
+	SentAt             int64    `json:"sent_at"`
 }
 
 type DeliveryStatus string
@@ -65,14 +65,17 @@ type MessageDeliveryPayload struct {
 }
 
 type ConversationCreatePayload struct {
-	ConversationID string `json:"conversation_id"`
-	ToUserID       string `json:"to_user_id"`
+	ConversationID   string   `json:"conversation_id"`
+	ConversationName string   `json:"conversation_name,omitempty"`
+	ToUserIDs        []string `json:"to_user_ids"`
 }
 
 type ConversationCreatedPayload struct {
-	ConversationID string `json:"conversation_id"`
-	FromUserID     string `json:"from_user_id"`
-	FromFriendCode string `json:"from_friend_code"`
+	ConversationID     string   `json:"conversation_id"`
+	ConversationName   string   `json:"conversation_name,omitempty"`
+	ParticipantUserIDs []string `json:"participant_user_ids"`
+	FromUserID         string   `json:"from_user_id"`
+	FromFriendCode     string   `json:"from_friend_code"`
 }
 
 type ErrorPayload struct {

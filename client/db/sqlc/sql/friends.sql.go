@@ -10,13 +10,7 @@ import (
 )
 
 const listFriends = `-- name: ListFriends :many
-SELECT
-  id,
-  user_id,
-  name,
-  username,
-  friend_code,
-  created_at
+SELECT id, user_id, name, username, profile_picture_url, friend_code, created_at
 FROM friends
 ORDER BY created_at ASC
 `
@@ -35,6 +29,7 @@ func (q *Queries) ListFriends(ctx context.Context) ([]Friend, error) {
 			&i.UserID,
 			&i.Name,
 			&i.Username,
+			&i.ProfilePictureUrl,
 			&i.FriendCode,
 			&i.CreatedAt,
 		); err != nil {
@@ -57,26 +52,36 @@ INSERT INTO friends (
   name,
   username,
   friend_code,
+	profile_picture_url,
   created_at
 ) VALUES (
-  ?, ?, ?, ?, ?
+  ?, ?, ?, ?, ?, ?
 )
 ON CONFLICT(user_id) DO UPDATE SET
   name = excluded.name,
   username = excluded.username,
   friend_code = excluded.friend_code,
+  profile_picture_url = excluded.profile_picture_url,
   created_at = excluded.created_at
 `
 
 type UpsertFriendParams struct {
-	UserID     string `db:"user_id" json:"user_id"`
-	Name       string `db:"name" json:"name"`
-	Username   string `db:"username" json:"username"`
-	FriendCode string `db:"friend_code" json:"friend_code"`
-	CreatedAt  int64  `db:"created_at" json:"created_at"`
+	UserID            string `db:"user_id" json:"user_id"`
+	Name              string `db:"name" json:"name"`
+	Username          string `db:"username" json:"username"`
+	FriendCode        string `db:"friend_code" json:"friend_code"`
+	ProfilePictureUrl string `db:"profile_picture_url" json:"profile_picture_url"`
+	CreatedAt         int64  `db:"created_at" json:"created_at"`
 }
 
 func (q *Queries) UpsertFriend(ctx context.Context, arg UpsertFriendParams) error {
-	_, err := q.db.ExecContext(ctx, upsertFriend, arg.UserID, arg.Name, arg.Username, arg.FriendCode, arg.CreatedAt)
+	_, err := q.db.ExecContext(ctx, upsertFriend,
+		arg.UserID,
+		arg.Name,
+		arg.Username,
+		arg.FriendCode,
+		arg.ProfilePictureUrl,
+		arg.CreatedAt,
+	)
 	return err
 }

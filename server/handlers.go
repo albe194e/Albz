@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -14,12 +15,17 @@ func (s *relayServer) handleMessageSend(client *clientConn, envelope rawEnvelope
 		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, "invalid message.send payload")
 	}
 
-	if payload.ClientMessageID == "" || payload.ConversationID == "" || payload.ToUserID == "" || strings.TrimSpace(payload.Body) == "" {
+	recipientUserIDs, err := normalizeRecipientUserIDs(client.userID, payload.ToUserIDs)
+	if err != nil {
+		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, err.Error())
+	}
+
+	if payload.ClientMessageID == "" || payload.ConversationID == "" || strings.TrimSpace(payload.Body) == "" {
 		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, "missing required message fields")
 	}
 
-	recipient := s.getClientByUserID(payload.ToUserID)
-	if recipient == nil {
+	recipients := s.getClientsByUserIDs(recipientUserIDs)
+	if len(recipients) != len(recipientUserIDs) {
 		return client.writeJSON(protocol.Envelope[protocol.MessageDeliveryPayload]{
 			Type:      protocol.EventMessageDelivery,
 			EventID:   newID(),
@@ -32,32 +38,35 @@ func (s *relayServer) handleMessageSend(client *clientConn, envelope rawEnvelope
 		})
 	}
 
+	participantUserIDs := append([]string{client.userID}, recipientUserIDs...)
 	created := protocol.Envelope[protocol.MessageCreatedPayload]{
 		Type:      protocol.EventMessageCreated,
 		EventID:   newID(),
 		RequestID: envelope.RequestID,
 		Timestamp: time.Now().Unix(),
 		Payload: protocol.MessageCreatedPayload{
-			MessageID:      payload.ClientMessageID,
-			ConversationID: payload.ConversationID,
-			FromUserID:     client.userID,
-			ToUserID:       payload.ToUserID,
-			Body:           payload.Body,
-			SentAt:         payload.SentAt,
+			MessageID:          payload.ClientMessageID,
+			ConversationID:     payload.ConversationID,
+			FromUserID:         client.userID,
+			ParticipantUserIDs: participantUserIDs,
+			Body:               payload.Body,
+			SentAt:             payload.SentAt,
 		},
 	}
 
-	if err := recipient.writeJSON(created); err != nil {
-		return client.writeJSON(protocol.Envelope[protocol.MessageDeliveryPayload]{
-			Type:      protocol.EventMessageDelivery,
-			EventID:   newID(),
-			RequestID: envelope.RequestID,
-			Timestamp: time.Now().Unix(),
-			Payload: protocol.MessageDeliveryPayload{
-				ClientMessageID: payload.ClientMessageID,
-				Status:          protocol.DeliveryStatusRejected,
-			},
-		})
+	for _, recipient := range recipients {
+		if err := recipient.writeJSON(created); err != nil {
+			return client.writeJSON(protocol.Envelope[protocol.MessageDeliveryPayload]{
+				Type:      protocol.EventMessageDelivery,
+				EventID:   newID(),
+				RequestID: envelope.RequestID,
+				Timestamp: time.Now().Unix(),
+				Payload: protocol.MessageDeliveryPayload{
+					ClientMessageID: payload.ClientMessageID,
+					Status:          protocol.DeliveryStatusRejected,
+				},
+			})
+		}
 	}
 
 	return client.writeJSON(protocol.Envelope[protocol.MessageDeliveryPayload]{
@@ -78,33 +87,71 @@ func (s *relayServer) handleConversationCreate(client *clientConn, envelope rawE
 		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, "invalid conversation.create payload")
 	}
 
-	if strings.TrimSpace(payload.ConversationID) == "" || strings.TrimSpace(payload.ToUserID) == "" {
-		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, "conversation_id and to_user_id are required")
+	recipientUserIDs, err := normalizeRecipientUserIDs(client.userID, payload.ToUserIDs)
+	if err != nil {
+		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, err.Error())
 	}
-	if payload.ToUserID == client.userID {
-		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidRecipient, "cannot create a conversation with yourself")
+	if strings.TrimSpace(payload.ConversationID) == "" {
+		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, "conversation_id is required")
 	}
 
-	recipient := s.getClientByUserID(payload.ToUserID)
-	if recipient == nil {
+	recipients := s.getClientsByUserIDs(recipientUserIDs)
+	if len(recipients) != len(recipientUserIDs) {
 		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeRecipientOffline, "recipient is not currently online")
 	}
 
-	if err := recipient.writeJSON(protocol.Envelope[protocol.ConversationCreatedPayload]{
+	participantUserIDs := append([]string{client.userID}, recipientUserIDs...)
+	created := protocol.Envelope[protocol.ConversationCreatedPayload]{
 		Type:      protocol.EventConversationCreated,
 		EventID:   newID(),
 		RequestID: envelope.RequestID,
 		Timestamp: time.Now().Unix(),
 		Payload: protocol.ConversationCreatedPayload{
-			ConversationID: payload.ConversationID,
-			FromUserID:     client.userID,
-			FromFriendCode: client.friendCode,
+			ConversationID:     payload.ConversationID,
+			ConversationName:   payload.ConversationName,
+			ParticipantUserIDs: participantUserIDs,
+			FromUserID:         client.userID,
+			FromFriendCode:     client.friendCode,
 		},
-	}); err != nil {
-		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeRecipientOffline, "recipient is not currently online")
+	}
+
+	for _, recipient := range recipients {
+		if err := recipient.writeJSON(created); err != nil {
+			return s.sendError(client, envelope.RequestID, protocol.ErrorCodeRecipientOffline, "recipient is not currently online")
+		}
 	}
 
 	return nil
+}
+
+func normalizeRecipientUserIDs(senderUserID string, userIDs []string) ([]string, error) {
+	if len(userIDs) == 0 {
+		return nil, errors.New("at least one recipient is required")
+	}
+
+	normalized := make([]string, 0, len(userIDs))
+	seen := make(map[string]struct{}, len(userIDs))
+	for _, userID := range userIDs {
+		trimmed := strings.TrimSpace(userID)
+		if trimmed == "" {
+			return nil, errors.New("recipient user IDs must not be empty")
+		}
+		if trimmed == senderUserID {
+			return nil, errors.New("cannot create a conversation with yourself")
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+
+		seen[trimmed] = struct{}{}
+		normalized = append(normalized, trimmed)
+	}
+
+	if len(normalized) == 0 {
+		return nil, errors.New("at least one recipient is required")
+	}
+
+	return normalized, nil
 }
 
 func (s *relayServer) handleFriendRequestSend(client *clientConn, envelope rawEnvelope) error {

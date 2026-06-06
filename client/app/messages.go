@@ -48,7 +48,7 @@ func (c *Controller) AddMessage(ctx context.Context, conversationID string, body
 		return fmt.Errorf("message body is required")
 	}
 
-	recipientID, err := c.resolveConversationRecipient(ctx, conversationID)
+	recipientUserIDs, err := c.resolveConversationRecipients(ctx, conversationID)
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func (c *Controller) AddMessage(ctx context.Context, conversationID string, body
 	err = c.Net.SendMessage(uuid.NewString(), protocol.MessageSendPayload{
 		ClientMessageID: clientMessageID,
 		ConversationID:  conversationID,
-		ToUserID:        recipientID,
+		ToUserIDs:       recipientUserIDs,
 		Body:            trimmedBody,
 		SentAt:          now,
 	})
@@ -106,28 +106,24 @@ func (c *Controller) AddMessage(ctx context.Context, conversationID string, body
 	return nil
 }
 
-func (c *Controller) resolveConversationRecipient(ctx context.Context, conversationID string) (string, error) {
+func (c *Controller) resolveConversationRecipients(ctx context.Context, conversationID string) ([]string, error) {
 	participantIDs, err := c.Store.Q.ListConversationParticipantIDs(ctx, conversationID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	recipientID := ""
+	recipientIDs := make([]string, 0, len(participantIDs))
 	for _, participantID := range participantIDs {
 		if participantID == c.State.CurrentUser.ID {
 			continue
 		}
 
-		if recipientID != "" {
-			return "", fmt.Errorf("conversation %s has multiple recipients; group chat is not supported yet", conversationID)
-		}
-
-		recipientID = participantID
+		recipientIDs = append(recipientIDs, participantID)
 	}
 
-	if recipientID == "" {
-		return "", fmt.Errorf("conversation %s has no recipient participant", conversationID)
+	if len(recipientIDs) == 0 {
+		return nil, fmt.Errorf("conversation %s has no recipient participant", conversationID)
 	}
 
-	return recipientID, nil
+	return recipientIDs, nil
 }
