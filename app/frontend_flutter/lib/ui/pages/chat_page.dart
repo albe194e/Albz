@@ -19,7 +19,7 @@ class ChatPage extends StatelessWidget {
     final chatBody = Column(
       children: const [
         Expanded(child: ConversationPanel()),
-        SizedBox(height: 14),
+        SizedBox(height: 8),
         MessageInputPanel(),
       ],
     );
@@ -56,32 +56,30 @@ class ChatPage extends StatelessWidget {
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          const ConversationListPanel(),
-          const SizedBox(width: 12),
-          Expanded(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: AppColors.appShell,
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  children: [
-                    const ChatTopBar(mobile: false),
-                    const SizedBox(height: 16),
-                    Expanded(child: chatBody),
-                  ],
-                ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const ConversationListPanel(),
+        const SizedBox(width: 12),
+        Expanded(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.chatSurface,
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 8),
+              child: Column(
+                children: [
+                  const ChatTopBar(mobile: false),
+                  const SizedBox(height: 12),
+                  Expanded(child: chatBody),
+                ],
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

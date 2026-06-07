@@ -8,6 +8,7 @@ class AppInput extends StatelessWidget {
     required this.controller,
     this.obscureText = false,
     this.maxLines = 1,
+    this.suffixIcon,
   });
 
   final String label;
@@ -15,6 +16,7 @@ class AppInput extends StatelessWidget {
   final TextEditingController controller;
   final bool obscureText;
   final int maxLines;
+  final Widget? suffixIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +24,11 @@ class AppInput extends StatelessWidget {
       controller: controller,
       obscureText: obscureText,
       maxLines: obscureText ? 1 : maxLines,
-      decoration: InputDecoration(labelText: label, hintText: hint),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        suffixIcon: suffixIcon,
+      ),
     );
   }
 }

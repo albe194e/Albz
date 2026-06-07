@@ -8,6 +8,8 @@ class AppPanel extends StatelessWidget {
     required this.child,
     this.header,
     this.footer,
+    this.showHeaderDivider = true,
+    this.showFooterDivider = true,
     this.padding = const EdgeInsets.all(18),
     this.color = AppColors.panel,
     this.radius = 24,
@@ -17,6 +19,8 @@ class AppPanel extends StatelessWidget {
   final Widget child;
   final Widget? header;
   final Widget? footer;
+  final bool showHeaderDivider;
+  final bool showFooterDivider;
   final EdgeInsetsGeometry padding;
   final Color color;
   final double radius;
@@ -37,14 +41,16 @@ class AppPanel extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
               child: header!,
             ),
-            const SizedBox(height: 14),
-            const Divider(height: 1),
+            if (showHeaderDivider) ...[
+              const SizedBox(height: 14),
+              const Divider(height: 1),
+            ],
           ],
           Expanded(
             child: Padding(padding: padding, child: child),
           ),
           if (footer != null) ...[
-            const Divider(height: 1),
+            if (showFooterDivider) const Divider(height: 1),
             Padding(padding: const EdgeInsets.all(18), child: footer!),
           ],
         ],

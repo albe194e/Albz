@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app/app_controller.dart';
 import 'app/app_scope.dart';
+import 'ui/components/navigation/app_shell.dart';
 import 'ui/router/app_router.dart';
 import 'ui/theme/app_theme.dart';
 
@@ -84,7 +85,11 @@ class _AlbzAppState extends State<AlbzApp> {
                         message: _controller.infoMessage,
                         color: AppColors.textMuted,
                       ),
-                    Expanded(child: AppRouter(controller: _controller)),
+                    Expanded(
+                      child: AppShell(
+                        child: AppRouter(controller: _controller),
+                      ),
+                    ),
                   ],
                 ),
               ),

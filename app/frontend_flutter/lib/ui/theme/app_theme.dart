@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 class AppColors {
   static const appBackground = Color(0xFF24282D);
   static const appShell = Color(0xE614171B);
+  static const navRail = Color(0xFF111317);
+  static const navRailHover = Color(0xFF2A2F36);
+  static const chatSurface = appBackground;
   static const panel = Color(0xCC1D2127);
   static const panelMuted = Color(0xB3171A1F);
   static const card = Color(0xFF2A2F36);
