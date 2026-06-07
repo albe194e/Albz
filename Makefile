@@ -8,9 +8,9 @@ DEV_STOP_SCRIPT := $(CURDIR)\scripts\stop-dev-windows.ps1
 
 .PHONY: \
 	sqlc \
-	sqlc-client \
+	sqlc-core-go \
 	sqlc-server \
-	sqlc-verify-client \
+	sqlc-verify-core-go \
 	sqlc-verify-server \
 	build-core-go-windows \
 	run-server \
@@ -23,27 +23,27 @@ DEV_STOP_SCRIPT := $(CURDIR)\scripts\stop-dev-windows.ps1
 	stop-dev \
 	reset-client-data
 
-sqlc-client: ## Generate sqlc code for client
-	@echo "Generating client sqlc code..."
-	@$(POWERSHELL) -NoProfile -Command "Set-Location 'client'; go run github.com/sqlc-dev/sqlc/cmd/sqlc@$(SQLC_VERSION) -f 'db/sqlc/sqlc.yaml' generate"
+sqlc-core-go: ## Generate sqlc code for core-go
+	@echo "Generating core-go sqlc code..."
+	@$(POWERSHELL) -NoProfile -Command "Set-Location 'app/core-go'; go run github.com/sqlc-dev/sqlc/cmd/sqlc@$(SQLC_VERSION) -f 'db/sqlc/sqlc.yaml' generate"
 
 sqlc-server: ## Generate sqlc code for server
 	@echo "Generating server sqlc code..."
 	@$(POWERSHELL) -NoProfile -Command "Set-Location 'server'; go run github.com/sqlc-dev/sqlc/cmd/sqlc@$(SQLC_VERSION) -f 'db/sqlc.yaml' generate"
 
-sqlc: sqlc-client sqlc-server ## Generate sqlc code for client and server
+sqlc: sqlc-core-go sqlc-server ## Generate sqlc code for core-go and server
 
-sqlc-verify-client: ## Verify generated client sqlc code is committed
-	@echo "Verifying client sqlc output..."
-	@$(POWERSHELL) -NoProfile -Command "Set-Location 'client'; go run github.com/sqlc-dev/sqlc/cmd/sqlc@$(SQLC_VERSION) -f 'db/sqlc/sqlc.yaml' generate"
-	@git diff --exit-code -- client/db/generated
+sqlc-verify-core-go: ## Verify generated core-go sqlc code is committed
+	@echo "Verifying core-go sqlc output..."
+	@$(POWERSHELL) -NoProfile -Command "Set-Location 'app/core-go'; go run github.com/sqlc-dev/sqlc/cmd/sqlc@$(SQLC_VERSION) -f 'db/sqlc/sqlc.yaml' generate"
+	@git diff --exit-code -- app/core-go/db/sqlc/sql
 
 sqlc-verify-server: ## Verify generated server sqlc code is committed
 	@echo "Verifying server sqlc output..."
 	@$(POWERSHELL) -NoProfile -Command "Set-Location 'server'; go run github.com/sqlc-dev/sqlc/cmd/sqlc@$(SQLC_VERSION) -f 'db/sqlc.yaml' generate"
 	@git diff --exit-code -- server/db/generated
 
-sqlc-verify: sqlc-verify-client sqlc-verify-server ## Verify all generated sqlc code is committed
+sqlc-verify: sqlc-verify-core-go sqlc-verify-server ## Verify all generated sqlc code is committed
 
 build-core-go-windows: ## Build the core-go shared library for the Flutter Windows app
 	@echo "Building core-go Windows shared library..."

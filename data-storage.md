@@ -4,7 +4,7 @@ This document describes the current data storage and transmission behavior in th
 
 ## Local data stored on the client
 
-The Go desktop client stores its local SQLite database under:
+The current desktop app stores its local SQLite database under:
 
 - default desktop path: `dev-local-db/local_storage/albz.db`
 - named desktop development profiles: `dev-local-db/local_storage/profiles/<profile>/albz.db`

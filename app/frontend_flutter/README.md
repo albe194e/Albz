@@ -1,11 +1,11 @@
 # Frontend Flutter
 
-`app/frontend_flutter/` is the new Flutter frontend for the local-first app.
+`app/frontend_flutter/` is the current Flutter frontend for the local-first app.
 
 Current status:
 
 - desktop Windows proof-of-concept bridge to `app/core-go/` is implemented
-- the app now has the first real UI scaffold that mirrors the old Fyne structure
+- the app now has the first real UI scaffold for the current desktop/mobile direction
 - landing, login, register, chat, and profile pages now exist in Flutter
 - conversation and message lists render from the current core snapshot
 - local session bootstrap, login, and register are now wired
@@ -69,7 +69,7 @@ The Windows Flutter build installs `albz_core.dll` next to the app executable so
 This first milestone proves both:
 
 - Flutter can talk to the embedded Go core
-- the old Fyne UI structure can be mirrored cleanly in Flutter
+- the current desktop chat/product flows can be carried by Flutter
 
 Exposed desktop proof-of-concept calls:
 
