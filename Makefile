@@ -1,11 +1,10 @@
 SQLC_VERSION ?= v1.31.1
 POWERSHELL ?= powershell.exe
-FYNE ?= fyne
-APP_ID ?= com.albe194e.albz
-APP_ICON ?= Icon.png
-DEV_SERVER_CMD := title Albz Dev Server && go run ./server
-DEV_CLIENT_ALICE_CMD := title Albz Dev Client Alice && go run ./client -profile alice
-DEV_CLIENT_BOB_CMD := title Albz Dev Client Bob && go run ./client -profile bob
+FLUTTER ?= flutter
+FRONTEND_FLUTTER_DIR := app/frontend_flutter
+DEV_SERVER_SCRIPT := $(CURDIR)\scripts\run-server-window.ps1
+DEV_CLIENT_SCRIPT := $(CURDIR)\scripts\run-flutter-client-window.ps1
+DEV_STOP_SCRIPT := $(CURDIR)\scripts\stop-dev-windows.ps1
 
 .PHONY: \
 	sqlc \
@@ -13,6 +12,7 @@ DEV_CLIENT_BOB_CMD := title Albz Dev Client Bob && go run ./client -profile bob
 	sqlc-server \
 	sqlc-verify-client \
 	sqlc-verify-server \
+	build-core-go-windows \
 	run-server \
 	run-client \
 	run-client-profile \
@@ -21,9 +21,7 @@ DEV_CLIENT_BOB_CMD := title Albz Dev Client Bob && go run ./client -profile bob
 	run-clients \
 	run-dev \
 	stop-dev \
-	package-android \
-	package-ios \
-	package-mobile
+	reset-client-data
 
 sqlc-client: ## Generate sqlc code for client
 	@echo "Generating client sqlc code..."
@@ -47,34 +45,33 @@ sqlc-verify-server: ## Verify generated server sqlc code is committed
 
 sqlc-verify: sqlc-verify-client sqlc-verify-server ## Verify all generated sqlc code is committed
 
+build-core-go-windows: ## Build the core-go shared library for the Flutter Windows app
+	@echo "Building core-go Windows shared library..."
+	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "app/core-go/build-windows.ps1"
+
 run-server: ## Run the relay server in the current terminal
 	@go run ./server
 
-run-client: ## Run the desktop client with the default local database
-	@go run ./client
+run-client: build-core-go-windows ## Run the Flutter desktop client on Windows
+	@$(POWERSHELL) -NoProfile -Command "Set-Location '$(FRONTEND_FLUTTER_DIR)'; $(FLUTTER) run -d windows"
 
-run-client-profile: ## Run the desktop client with PROFILE=<name>
-	@$(POWERSHELL) -NoProfile -Command "if ([string]::IsNullOrWhiteSpace('$(PROFILE)')) { Write-Error 'Usage: make run-client-profile PROFILE=alice'; exit 1 }; go run ./client -profile '$(PROFILE)'"
+run-client-profile: build-core-go-windows ## Run the Flutter desktop client with PROFILE=<name>
+	@$(POWERSHELL) -NoProfile -Command "if ([string]::IsNullOrWhiteSpace('$(PROFILE)')) { Write-Error 'Usage: make run-client-profile PROFILE=alice'; exit 1 }; Set-Location '$(FRONTEND_FLUTTER_DIR)'; $(FLUTTER) run -d windows --dart-define=ALBZ_PROFILE=$(PROFILE)"
 
-run-client-alice: ## Run the desktop client with the alice profile
-	@go run ./client -profile alice
+run-client-alice: build-core-go-windows ## Run the Flutter desktop client with the alice profile
+	@$(POWERSHELL) -NoProfile -Command "Set-Location '$(FRONTEND_FLUTTER_DIR)'; $(FLUTTER) run -d windows --dart-define=ALBZ_PROFILE=alice"
 
-run-client-bob: ## Run the desktop client with the bob profile
-	@go run ./client -profile bob
+run-client-bob: build-core-go-windows ## Run the Flutter desktop client with the bob profile
+	@$(POWERSHELL) -NoProfile -Command "Set-Location '$(FRONTEND_FLUTTER_DIR)'; $(FLUTTER) run -d windows --dart-define=ALBZ_PROFILE=bob"
 
-run-clients: ## Launch alice and bob client windows together
-	@$(POWERSHELL) -NoProfile -Command "Start-Process cmd.exe -WorkingDirectory '$(CURDIR)' -ArgumentList '/c','$(DEV_CLIENT_ALICE_CMD)'; Start-Process cmd.exe -WorkingDirectory '$(CURDIR)' -ArgumentList '/c','$(DEV_CLIENT_BOB_CMD)'"
+run-clients: build-core-go-windows ## Launch alice and bob Flutter client windows together
+	@$(POWERSHELL) -NoProfile -Command "Start-Process powershell.exe -WorkingDirectory '$(CURDIR)' -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','$(DEV_CLIENT_SCRIPT)','-WorkspaceRoot','$(CURDIR)','-Profile','alice','-Flutter','$(FLUTTER)'; Start-Process powershell.exe -WorkingDirectory '$(CURDIR)' -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','$(DEV_CLIENT_SCRIPT)','-WorkspaceRoot','$(CURDIR)','-Profile','bob','-Flutter','$(FLUTTER)'"
 
-run-dev: ## Launch the server plus alice and bob client windows together
-	@$(POWERSHELL) -NoProfile -Command "Start-Process cmd.exe -WorkingDirectory '$(CURDIR)' -ArgumentList '/c','$(DEV_SERVER_CMD)'; Start-Process cmd.exe -WorkingDirectory '$(CURDIR)' -ArgumentList '/c','$(DEV_CLIENT_ALICE_CMD)'; Start-Process cmd.exe -WorkingDirectory '$(CURDIR)' -ArgumentList '/c','$(DEV_CLIENT_BOB_CMD)'"
+run-dev: build-core-go-windows ## Launch the server plus alice and bob Flutter client windows together
+	@$(POWERSHELL) -NoProfile -Command "Start-Process powershell.exe -WorkingDirectory '$(CURDIR)' -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','$(DEV_SERVER_SCRIPT)','-WorkspaceRoot','$(CURDIR)'; Start-Process powershell.exe -WorkingDirectory '$(CURDIR)' -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','$(DEV_CLIENT_SCRIPT)','-WorkspaceRoot','$(CURDIR)','-Profile','alice','-Flutter','$(FLUTTER)'; Start-Process powershell.exe -WorkingDirectory '$(CURDIR)' -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','$(DEV_CLIENT_SCRIPT)','-WorkspaceRoot','$(CURDIR)','-Profile','bob','-Flutter','$(FLUTTER)'"
 
 stop-dev: ## Stop the server and client windows started by run-dev/run-clients
-	@$(POWERSHELL) -NoProfile -Command "$$targets = @('$(DEV_SERVER_CMD)', '$(DEV_CLIENT_ALICE_CMD)', '$(DEV_CLIENT_BOB_CMD)'); foreach ($$target in $$targets) { $$processes = Get-CimInstance Win32_Process | Where-Object { $$_.Name -eq 'cmd.exe' -and $$_.CommandLine -like ('*' + $$target + '*') }; foreach ($$process in $$processes) { cmd /c ('taskkill /PID ' + $$process.ProcessId + ' /T /F') | Out-Null } }"
+	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "$(DEV_STOP_SCRIPT)"
 
-package-android: ## Package the Fyne client as an Android APK
-	@cd client && $(FYNE) package -os android -app-id $(APP_ID) -icon $(APP_ICON)
-
-package-ios: ## Package the Fyne client as an iOS app bundle (requires macOS + Xcode)
-	@cd client && $(FYNE) package -os ios -app-id $(APP_ID) -icon $(APP_ICON)
-
-package-mobile: package-android package-ios ## Package the Fyne client for Android and iOS
+reset-client-data: ## Delete local development client data (repo-local plus legacy Flutter fallback)
+	@$(POWERSHELL) -NoProfile -Command "$$paths = @('dev-local-db\local_storage'); if ($$env:LOCALAPPDATA) { $$paths += (Join-Path $$env:LOCALAPPDATA 'Albz\frontend_flutter') }; foreach ($$path in $$paths) { if (Test-Path -LiteralPath $$path) { Remove-Item -LiteralPath $$path -Recurse -Force } }"

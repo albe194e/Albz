@@ -1,6 +1,7 @@
 go 1.26.3
 
 use (
+	./app/core-go
 	./client
 	./server
 	./shared

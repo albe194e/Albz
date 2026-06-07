@@ -5,3 +5,23 @@ client/client.exe
 project-for-agent.md
 
 docs-for-agents
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub/
+.pub-cache/
+build/
+coverage/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+app/frontend_flutter/.metadata
+app/frontend_flutter/*.iml
+
+# IDE / OS
+.idea/
+.DS_Store
+*.log
+*.pyc
+*.swp
