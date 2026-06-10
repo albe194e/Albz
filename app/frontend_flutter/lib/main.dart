@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app/app_controller.dart';
+import 'app/app_page.dart';
 import 'app/app_scope.dart';
 import 'ui/components/navigation/app_shell.dart';
 import 'ui/router/app_router.dart';
@@ -86,9 +87,14 @@ class _AlbzAppState extends State<AlbzApp> {
                         color: AppColors.textMuted,
                       ),
                     Expanded(
-                      child: AppShell(
-                        child: AppRouter(controller: _controller),
-                      ),
+                      child: switch (_controller.page) {
+                        AppPage.chat || AppPage.profile => AppShell(
+                          child: AppRouter(controller: _controller),
+                        ),
+                        AppPage.landing ||
+                        AppPage.login ||
+                        AppPage.register => AppRouter(controller: _controller),
+                      },
                     ),
                   ],
                 ),
