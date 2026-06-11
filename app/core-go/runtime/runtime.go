@@ -62,14 +62,14 @@ func New(ctx context.Context, options Options) (*Service, error) {
 		FileHandler: fileHandler,
 	}
 	controller.Net = network.NewClient(config.ServerURL, network.Handlers{
-		OnConversationCreated:   controller.HandleConversationCreated,
-		OnMessageCreated:        controller.HandleIncomingMessage,
-		OnMessageDelivery:       controller.HandleMessageDelivery,
-		OnFriendRequestReceived: controller.HandleFriendRequestReceived,
-		OnFriendRequestAccepted: controller.HandleFriendRequestAccepted,
-		OnFriendRequestRejected: controller.HandleFriendRequestRejected,
-		OnError:                 controller.HandleNetworkError,
-		OnDisconnect:            controller.HandleDisconnect,
+		OnConversationCreated:    controller.HandleConversationCreated,
+		OnMessageCreated:         controller.HandleIncomingMessage,
+		OnMessageDelivery:        controller.HandleMessageDelivery,
+		OnContactRequestReceived: controller.HandleContactRequestReceived,
+		OnContactRequestAccepted: controller.HandleContactRequestAccepted,
+		OnContactRequestRejected: controller.HandleContactRequestRejected,
+		OnError:                  controller.HandleNetworkError,
+		OnDisconnect:             controller.HandleDisconnect,
 	})
 
 	return &Service{

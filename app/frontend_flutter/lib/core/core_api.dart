@@ -70,9 +70,9 @@ typedef _CoreSendMessageDart =
     int Function(int handle, Pointer<Utf8> conversationId, Pointer<Utf8> body);
 
 typedef _CoreStartDirectConversationNative =
-    Pointer<Utf8> Function(Uint64 handle, Pointer<Utf8> friendUserId);
+    Pointer<Utf8> Function(Uint64 handle, Pointer<Utf8> contactUserId);
 typedef _CoreStartDirectConversationDart =
-    Pointer<Utf8> Function(int handle, Pointer<Utf8> friendUserId);
+    Pointer<Utf8> Function(int handle, Pointer<Utf8> contactUserId);
 
 typedef _CoreCreateConversationNative =
     Pointer<Utf8> Function(
@@ -87,9 +87,9 @@ typedef _CoreCreateConversationDart =
       Pointer<Utf8> participantUserIdsJson,
     );
 
-typedef _CoreFriendActionNative =
+typedef _CoreContactActionNative =
     Int32 Function(Uint64 handle, Pointer<Utf8> value);
-typedef _CoreFriendActionDart = int Function(int handle, Pointer<Utf8> value);
+typedef _CoreContactActionDart = int Function(int handle, Pointer<Utf8> value);
 
 typedef _CoreSaveProfileImageNative =
     Pointer<Utf8> Function(
@@ -162,14 +162,14 @@ class CoreUser {
     required this.name,
     required this.username,
     required this.profilePictureUrl,
-    required this.friendCode,
+    required this.contactCode,
   });
 
   final String id;
   final String name;
   final String username;
   final String profilePictureUrl;
-  final String friendCode;
+  final String contactCode;
 
   factory CoreUser.fromJson(Map<String, dynamic> json) {
     return CoreUser(
@@ -177,7 +177,7 @@ class CoreUser {
       name: json['name'] as String? ?? '',
       username: json['username'] as String? ?? '',
       profilePictureUrl: json['profile_picture_url'] as String? ?? '',
-      friendCode: json['friend_code'] as String? ?? '',
+      contactCode: json['contact_code'] as String? ?? '',
     );
   }
 }
@@ -228,14 +228,14 @@ class CoreMessage {
   }
 }
 
-class CoreFriend {
-  const CoreFriend({
+class CoreContact {
+  const CoreContact({
     required this.id,
     required this.userId,
     required this.name,
     required this.username,
     required this.profilePictureUrl,
-    required this.friendCode,
+    required this.contactCode,
     required this.createdAt,
   });
 
@@ -244,29 +244,29 @@ class CoreFriend {
   final String name;
   final String username;
   final String profilePictureUrl;
-  final String friendCode;
+  final String contactCode;
   final int createdAt;
 
-  factory CoreFriend.fromJson(Map<String, dynamic> json) {
-    return CoreFriend(
+  factory CoreContact.fromJson(Map<String, dynamic> json) {
+    return CoreContact(
       id: json['id'] as int? ?? 0,
       userId: json['user_id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       username: json['username'] as String? ?? '',
       profilePictureUrl: json['profile_picture_url'] as String? ?? '',
-      friendCode: json['friend_code'] as String? ?? '',
+      contactCode: json['contact_code'] as String? ?? '',
       createdAt: json['created_at'] as int? ?? 0,
     );
   }
 }
 
-class CoreFriendRequest {
-  const CoreFriendRequest({
+class CoreContactRequest {
+  const CoreContactRequest({
     required this.id,
     required this.fromUserId,
     required this.name,
     required this.username,
-    required this.fromFriendCode,
+    required this.fromContactCode,
     required this.createdAt,
   });
 
@@ -274,16 +274,16 @@ class CoreFriendRequest {
   final String fromUserId;
   final String name;
   final String username;
-  final String fromFriendCode;
+  final String fromContactCode;
   final int createdAt;
 
-  factory CoreFriendRequest.fromJson(Map<String, dynamic> json) {
-    return CoreFriendRequest(
+  factory CoreContactRequest.fromJson(Map<String, dynamic> json) {
+    return CoreContactRequest(
       id: json['id'] as int? ?? 0,
       fromUserId: json['from_user_id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       username: json['username'] as String? ?? '',
-      fromFriendCode: json['from_friend_code'] as String? ?? '',
+      fromContactCode: json['from_contact_code'] as String? ?? '',
       createdAt: json['created_at'] as int? ?? 0,
     );
   }
@@ -294,8 +294,8 @@ class CoreSnapshot {
     required this.currentUser,
     required this.messages,
     required this.conversations,
-    required this.friends,
-    required this.friendRequests,
+    required this.contacts,
+    required this.contactRequests,
     required this.loadedConversationId,
     required this.serverConnected,
     required this.lastNetworkError,
@@ -304,8 +304,8 @@ class CoreSnapshot {
   final CoreUser? currentUser;
   final List<CoreMessage> messages;
   final List<CoreConversation> conversations;
-  final List<CoreFriend> friends;
-  final List<CoreFriendRequest> friendRequests;
+  final List<CoreContact> contacts;
+  final List<CoreContactRequest> contactRequests;
   final String loadedConversationId;
   final bool serverConnected;
   final String lastNetworkError;
@@ -324,14 +324,14 @@ class CoreSnapshot {
               .whereType<Map<String, dynamic>>()
               .map(CoreConversation.fromJson)
               .toList(growable: false)),
-      friends: ((json['friends'] as List<dynamic>? ?? const <dynamic>[])
+      contacts: ((json['contacts'] as List<dynamic>? ?? const <dynamic>[])
           .whereType<Map<String, dynamic>>()
-          .map(CoreFriend.fromJson)
+          .map(CoreContact.fromJson)
           .toList(growable: false)),
-      friendRequests:
-          ((json['friend_requests'] as List<dynamic>? ?? const <dynamic>[])
+      contactRequests:
+          ((json['contact_requests'] as List<dynamic>? ?? const <dynamic>[])
               .whereType<Map<String, dynamic>>()
-              .map(CoreFriendRequest.fromJson)
+              .map(CoreContactRequest.fromJson)
               .toList(growable: false)),
       loadedConversationId: json['loaded_conversation_id'] as String? ?? '',
       serverConnected: json['server_connected'] as bool? ?? false,
@@ -348,7 +348,7 @@ class CoreSnapshot {
               'name': currentUser!.name,
               'username': currentUser!.username,
               'profile_picture_url': currentUser!.profilePictureUrl,
-              'friend_code': currentUser!.friendCode,
+              'contact_code': currentUser!.contactCode,
             },
       'messages': messages
           .map(
@@ -371,27 +371,27 @@ class CoreSnapshot {
             },
           )
           .toList(growable: false),
-      'friends': friends
+      'contacts': contacts
           .map(
-            (friend) => {
-              'id': friend.id,
-              'user_id': friend.userId,
-              'name': friend.name,
-              'username': friend.username,
-              'profile_picture_url': friend.profilePictureUrl,
-              'friend_code': friend.friendCode,
-              'created_at': friend.createdAt,
+            (contact) => {
+              'id': contact.id,
+              'user_id': contact.userId,
+              'name': contact.name,
+              'username': contact.username,
+              'profile_picture_url': contact.profilePictureUrl,
+              'contact_code': contact.contactCode,
+              'created_at': contact.createdAt,
             },
           )
           .toList(growable: false),
-      'friend_requests': friendRequests
+      'contact_requests': contactRequests
           .map(
             (request) => {
               'id': request.id,
               'from_user_id': request.fromUserId,
               'name': request.name,
               'username': request.username,
-              'from_friend_code': request.fromFriendCode,
+              'from_contact_code': request.fromContactCode,
               'created_at': request.createdAt,
             },
           )
@@ -465,17 +465,17 @@ class CoreApi {
             _CoreCreateConversationNative,
             _CoreCreateConversationDart
           >('core_create_conversation'),
-      _coreSendFriendRequest = library
-          .lookupFunction<_CoreFriendActionNative, _CoreFriendActionDart>(
-            'core_send_friend_request',
+      _coreSendContactRequest = library
+          .lookupFunction<_CoreContactActionNative, _CoreContactActionDart>(
+            'core_send_contact_request',
           ),
-      _coreAcceptFriendRequest = library
-          .lookupFunction<_CoreFriendActionNative, _CoreFriendActionDart>(
-            'core_accept_friend_request',
+      _coreAcceptContactRequest = library
+          .lookupFunction<_CoreContactActionNative, _CoreContactActionDart>(
+            'core_accept_contact_request',
           ),
-      _coreRejectFriendRequest = library
-          .lookupFunction<_CoreFriendActionNative, _CoreFriendActionDart>(
-            'core_reject_friend_request',
+      _coreRejectContactRequest = library
+          .lookupFunction<_CoreContactActionNative, _CoreContactActionDart>(
+            'core_reject_contact_request',
           ),
       _coreSaveProfileImage = library
           .lookupFunction<
@@ -506,9 +506,9 @@ class CoreApi {
   final _CoreSendMessageDart _coreSendMessage;
   final _CoreStartDirectConversationDart _coreStartDirectConversation;
   final _CoreCreateConversationDart _coreCreateConversation;
-  final _CoreFriendActionDart _coreSendFriendRequest;
-  final _CoreFriendActionDart _coreAcceptFriendRequest;
-  final _CoreFriendActionDart _coreRejectFriendRequest;
+  final _CoreContactActionDart _coreSendContactRequest;
+  final _CoreContactActionDart _coreAcceptContactRequest;
+  final _CoreContactActionDart _coreRejectContactRequest;
   final _CoreSaveProfileImageDart _coreSaveProfileImage;
   final _CorePollEventJSONDart _corePollEventJSON;
   final _CoreTakeLastErrorDart _coreTakeLastError;
@@ -658,12 +658,12 @@ class CoreApi {
     }
   }
 
-  Future<String> startDirectConversation(String friendUserId) async {
+  Future<String> startDirectConversation(String contactUserId) async {
     final handle = _requireHandle();
-    final friendPointer = friendUserId.toNativeUtf8();
+    final contactPointer = contactUserId.toNativeUtf8();
 
     try {
-      final pointer = _coreStartDirectConversation(handle, friendPointer);
+      final pointer = _coreStartDirectConversation(handle, contactPointer);
       if (pointer == nullptr) {
         throw CoreApiError(_takeLastErrorMessage());
       }
@@ -672,7 +672,7 @@ class CoreApi {
       _coreStringFree(pointer);
       return conversationId;
     } finally {
-      calloc.free(friendPointer);
+      calloc.free(contactPointer);
     }
   }
 
@@ -705,26 +705,26 @@ class CoreApi {
     }
   }
 
-  Future<void> sendFriendRequest(String friendCode) async {
+  Future<void> sendContactRequest(String contactCode) async {
     final handle = _requireHandle();
-    final friendCodePointer = friendCode.toNativeUtf8();
+    final contactCodePointer = contactCode.toNativeUtf8();
 
     try {
-      final result = _coreSendFriendRequest(handle, friendCodePointer);
+      final result = _coreSendContactRequest(handle, contactCodePointer);
       if (result != 1) {
         throw CoreApiError(_takeLastErrorMessage());
       }
     } finally {
-      calloc.free(friendCodePointer);
+      calloc.free(contactCodePointer);
     }
   }
 
-  Future<void> acceptFriendRequest(String fromUserId) async {
+  Future<void> acceptContactRequest(String fromUserId) async {
     final handle = _requireHandle();
     final fromUserIdPointer = fromUserId.toNativeUtf8();
 
     try {
-      final result = _coreAcceptFriendRequest(handle, fromUserIdPointer);
+      final result = _coreAcceptContactRequest(handle, fromUserIdPointer);
       if (result != 1) {
         throw CoreApiError(_takeLastErrorMessage());
       }
@@ -733,12 +733,12 @@ class CoreApi {
     }
   }
 
-  Future<void> rejectFriendRequest(String fromUserId) async {
+  Future<void> rejectContactRequest(String fromUserId) async {
     final handle = _requireHandle();
     final fromUserIdPointer = fromUserId.toNativeUtf8();
 
     try {
-      final result = _coreRejectFriendRequest(handle, fromUserIdPointer);
+      final result = _coreRejectContactRequest(handle, fromUserIdPointer);
       if (result != 1) {
         throw CoreApiError(_takeLastErrorMessage());
       }
@@ -841,6 +841,9 @@ class CoreApi {
   }
 
   static String _defaultLibraryPath() {
+    if (Platform.isAndroid) {
+      return 'libalbz_core.so';
+    }
     if (Platform.isWindows) {
       return 'albz_core.dll';
     }

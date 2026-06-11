@@ -1,1 +1,1 @@
-enum AppPage { landing, login, register, chat, profile }
+enum AppPage { landing, login, register, chat, profile, contacts }

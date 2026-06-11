@@ -91,8 +91,8 @@ func snapshotFromState(state *clientapp.AppState) Snapshot {
 	snapshot := Snapshot{
 		Messages:             make([]Message, 0, len(state.Messages)),
 		Conversations:        make([]Conversation, 0, len(state.Conversations)),
-		Friends:              make([]Friend, 0, len(state.Friends)),
-		FriendRequests:       make([]FriendRequest, 0, len(state.FriendRequests)),
+		Contacts:             make([]Contact, 0, len(state.Contacts)),
+		ContactRequests:      make([]ContactRequest, 0, len(state.ContactRequests)),
 		LoadedConversationID: state.LoadedConversationID,
 		ServerConnected:      state.ServerConnected,
 		LastNetworkError:     state.LastNetworkError,
@@ -104,7 +104,7 @@ func snapshotFromState(state *clientapp.AppState) Snapshot {
 			Name:              state.CurrentUser.Name,
 			Username:          state.CurrentUser.Username,
 			ProfilePictureUrl: state.CurrentUser.ProfilePictureUrl,
-			FriendCode:        state.CurrentUser.FriendCode,
+			ContactCode:       state.CurrentUser.ContactCode,
 		}
 	}
 
@@ -127,32 +127,32 @@ func snapshotFromState(state *clientapp.AppState) Snapshot {
 		})
 	}
 
-	for _, friend := range state.Friends {
-		snapshot.Friends = append(snapshot.Friends, mapFriend(friend))
+	for _, contact := range state.Contacts {
+		snapshot.Contacts = append(snapshot.Contacts, mapContact(contact))
 	}
 
-	for _, request := range state.FriendRequests {
-		snapshot.FriendRequests = append(snapshot.FriendRequests, FriendRequest{
-			ID:             request.ID,
-			FromUserID:     request.FromUserID,
-			Name:           request.Name,
-			Username:       request.Username,
-			FromFriendCode: request.FromFriendCode,
-			CreatedAt:      request.CreatedAt,
+	for _, request := range state.ContactRequests {
+		snapshot.ContactRequests = append(snapshot.ContactRequests, ContactRequest{
+			ID:              request.ID,
+			FromUserID:      request.FromUserID,
+			Name:            request.Name,
+			Username:        request.Username,
+			FromContactCode: request.FromContactCode,
+			CreatedAt:       request.CreatedAt,
 		})
 	}
 
 	return snapshot
 }
 
-func mapFriend(friend sql.Friend) Friend {
-	return Friend{
-		ID:                friend.ID,
-		UserID:            friend.UserID,
-		Name:              friend.Name,
-		Username:          friend.Username,
-		ProfilePictureUrl: friend.ProfilePictureUrl,
-		FriendCode:        friend.FriendCode,
-		CreatedAt:         friend.CreatedAt,
+func mapContact(contact sql.Contact) Contact {
+	return Contact{
+		ID:                contact.ID,
+		UserID:            contact.UserID,
+		Name:              contact.Name,
+		Username:          contact.Username,
+		ProfilePictureUrl: contact.ProfilePictureUrl,
+		ContactCode:       contact.ContactCode,
+		CreatedAt:         contact.CreatedAt,
 	}
 }

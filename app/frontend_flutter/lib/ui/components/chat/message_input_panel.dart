@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../app/app_scope.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/responsive.dart';
 import '../base/app_input.dart';
 
 class MessageInputPanel extends StatefulWidget {
@@ -24,6 +25,8 @@ class _MessageInputPanelState extends State<MessageInputPanel> {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
+    final width = MediaQuery.sizeOf(context).width;
+    final narrow = AppBreakpoints.isNarrow(width);
 
     Future<void> sendCurrentMessage() async {
       final success = await controller.sendMessage(_messageController.text);
@@ -33,7 +36,7 @@ class _MessageInputPanelState extends State<MessageInputPanel> {
     }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(0, 6, 0, 0),
+      padding: EdgeInsets.fromLTRB(0, narrow ? 2 : 6, 0, 0),
       decoration: BoxDecoration(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(24),
@@ -56,7 +59,6 @@ class _MessageInputPanelState extends State<MessageInputPanel> {
               ),
             ),
             splashRadius: 18,
-            tooltip: 'Send',
           ),
         ),
       ),

@@ -5,7 +5,7 @@ INSERT INTO users (
 	username,
 	hashed_password,
 	profile_picture_url,
-	friend_code
+	contact_code
 ) VALUES (
 	?, ?, ?, ?, ?, ?
 );

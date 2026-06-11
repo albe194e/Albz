@@ -19,7 +19,7 @@ func (c *Controller) Register(ctx context.Context, name, username, password, pro
 		Name:              name,
 		HashedPassword:    password,
 		ProfilePictureUrl: profile_url,
-		FriendCode:        newFriendCode(),
+		ContactCode:       newContactCode(),
 	}
 
 	err := c.Store.Q.CreateUser(ctx, createUserParams)
@@ -60,7 +60,7 @@ func (c *Controller) Login(ctx context.Context, username, password string) error
 	return nil
 }
 
-func newFriendCode() string {
+func newContactCode() string {
 	value := strings.ToUpper(strings.ReplaceAll(uuid.NewString(), "-", ""))
 	return "ALBZ-" + value[:12]
 }
@@ -143,8 +143,8 @@ func (c *Controller) Logout(ctx context.Context) error {
 		c.State.CurrentUser = nil
 		c.State.Messages = nil
 		c.State.Conversations = nil
-		c.State.Friends = nil
-		c.State.FriendRequests = nil
+		c.State.Contacts = nil
+		c.State.ContactRequests = nil
 		c.State.LoadedConversationID = ""
 		c.State.ServerConnected = false
 		c.State.LastNetworkError = ""

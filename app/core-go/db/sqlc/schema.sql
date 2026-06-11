@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS users (
 	username TEXT NOT NULL UNIQUE,
 	hashed_password TEXT NOT NULL,
 	profile_picture_url TEXT NOT NULL,
-	friend_code TEXT NOT NULL UNIQUE
+	contact_code TEXT NOT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -42,21 +42,21 @@ CREATE TABLE IF NOT EXISTS conversation_participants (
 	participant_id VARCHAR(16) NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS friends (
+CREATE TABLE IF NOT EXISTS contacts (
 	id INTEGER PRIMARY KEY,
 	user_id VARCHAR(36) NOT NULL UNIQUE,
 	name TEXT NOT NULL,
 	username TEXT NOT NULL,
 	profile_picture_url TEXT NOT NULL,
-	friend_code TEXT NOT NULL,
+	contact_code TEXT NOT NULL,
 	created_at INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS friend_requests (
+CREATE TABLE IF NOT EXISTS contact_requests (
 	id INTEGER PRIMARY KEY,
 	from_user_id VARCHAR(36) NOT NULL UNIQUE,
 	name TEXT NOT NULL,
 	username TEXT NOT NULL,
-	from_friend_code TEXT NOT NULL,
+	from_contact_code TEXT NOT NULL,
 	created_at INTEGER NOT NULL
 );

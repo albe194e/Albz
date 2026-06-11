@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../../app/app_page.dart';
 import '../../../app/app_scope.dart';
 import '../../../core/core_api.dart';
 import '../../theme/app_theme.dart';
-import '../base/app_button.dart';
 import '../base/app_panel.dart';
-import '../base/profile_picture.dart';
 
 class ConversationListPanel extends StatefulWidget {
   const ConversationListPanel({super.key, this.compact = false});
@@ -43,6 +40,7 @@ class _ConversationListPanelState extends State<ConversationListPanel> {
       width: widget.compact ? null : 252,
       color: AppColors.chatSurface,
       showHeaderDivider: false,
+      showFooterDivider: !widget.compact,
       header: SizedBox(
         height: 68,
         child: Align(
@@ -51,28 +49,13 @@ class _ConversationListPanelState extends State<ConversationListPanel> {
             controller: _searchController,
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
-              hintText: 'Search',
+              hintText: 'search',
               prefixIcon: Icon(Icons.search_rounded),
             ),
           ),
         ),
       ),
-      footer: widget.compact
-          ? Row(
-              children: [
-                Expanded(
-                  child: AppButton.secondary(
-                    label: 'Profile',
-                    onPressed: () => controller.navigateTo(AppPage.profile),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ProfilePicture(
-                  path: controller.currentUser?.profilePictureUrl ?? '',
-                ),
-              ],
-            )
-          : null,
+      footer: null,
       child: conversations.isEmpty
           ? const Center(
               child: Text(

@@ -12,25 +12,25 @@ import (
 )
 
 type Handlers struct {
-	OnConversationCreated   func(protocol.Envelope[protocol.ConversationCreatedPayload])
-	OnMessageCreated        func(protocol.Envelope[protocol.MessageCreatedPayload])
-	OnMessageDelivery       func(protocol.Envelope[protocol.MessageDeliveryPayload])
-	OnFriendRequestReceived func(protocol.Envelope[protocol.FriendRequestReceivedPayload])
-	OnFriendRequestAccepted func(protocol.Envelope[protocol.FriendRequestAcceptedPayload])
-	OnFriendRequestRejected func(protocol.Envelope[protocol.FriendRequestRejectedPayload])
-	OnError                 func(protocol.Envelope[protocol.ErrorPayload])
-	OnDisconnect            func(error)
+	OnConversationCreated    func(protocol.Envelope[protocol.ConversationCreatedPayload])
+	OnMessageCreated         func(protocol.Envelope[protocol.MessageCreatedPayload])
+	OnMessageDelivery        func(protocol.Envelope[protocol.MessageDeliveryPayload])
+	OnContactRequestReceived func(protocol.Envelope[protocol.ContactRequestReceivedPayload])
+	OnContactRequestAccepted func(protocol.Envelope[protocol.ContactRequestAcceptedPayload])
+	OnContactRequestRejected func(protocol.Envelope[protocol.ContactRequestRejectedPayload])
+	OnError                  func(protocol.Envelope[protocol.ErrorPayload])
+	OnDisconnect             func(error)
 }
 
 type Client struct {
 	serverURL string
 	handlers  Handlers
 
-	mu         sync.RWMutex
-	conn       *websocket.Conn
-	userID     string
-	friendCode string
-	writeMu    sync.Mutex
+	mu          sync.RWMutex
+	conn        *websocket.Conn
+	userID      string
+	contactCode string
+	writeMu     sync.Mutex
 }
 
 type rawEnvelope struct {
@@ -48,16 +48,16 @@ func NewClient(serverURL string, handlers Handlers) *Client {
 	}
 }
 
-func (c *Client) Connect(userID string, friendCode string) error {
+func (c *Client) Connect(userID string, contactCode string) error {
 	if strings.TrimSpace(userID) == "" {
 		return fmt.Errorf("user ID is required")
 	}
-	if strings.TrimSpace(friendCode) == "" {
-		return fmt.Errorf("friend code is required")
+	if strings.TrimSpace(contactCode) == "" {
+		return fmt.Errorf("contact code is required")
 	}
 
 	c.mu.RLock()
-	if c.conn != nil && c.userID == userID && c.friendCode == friendCode {
+	if c.conn != nil && c.userID == userID && c.contactCode == contactCode {
 		c.mu.RUnlock()
 		return nil
 	}
@@ -70,7 +70,7 @@ func (c *Client) Connect(userID string, friendCode string) error {
 
 	query := wsURL.Query()
 	query.Set("user_id", userID)
-	query.Set("friend_code", friendCode)
+	query.Set("contact_code", contactCode)
 	wsURL.RawQuery = query.Encode()
 
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL.String(), nil)
@@ -84,7 +84,7 @@ func (c *Client) Connect(userID string, friendCode string) error {
 	previous = c.conn
 	c.conn = conn
 	c.userID = userID
-	c.friendCode = friendCode
+	c.contactCode = contactCode
 	c.mu.Unlock()
 
 	if previous != nil {
@@ -100,7 +100,7 @@ func (c *Client) Close() error {
 	conn := c.conn
 	c.conn = nil
 	c.userID = ""
-	c.friendCode = ""
+	c.contactCode = ""
 	c.mu.Unlock()
 
 	if conn == nil {
@@ -184,13 +184,13 @@ func (c *Client) handleIncoming(data []byte) error {
 				Payload:   payload,
 			})
 		}
-	case protocol.EventFriendRequestReceived:
-		var payload protocol.FriendRequestReceivedPayload
+	case protocol.EventContactRequestReceived:
+		var payload protocol.ContactRequestReceivedPayload
 		if err := json.Unmarshal(envelope.Payload, &payload); err != nil {
-			return fmt.Errorf("decode friend_request.received payload: %w", err)
+			return fmt.Errorf("decode contact_request.received payload: %w", err)
 		}
-		if c.handlers.OnFriendRequestReceived != nil {
-			c.handlers.OnFriendRequestReceived(protocol.Envelope[protocol.FriendRequestReceivedPayload]{
+		if c.handlers.OnContactRequestReceived != nil {
+			c.handlers.OnContactRequestReceived(protocol.Envelope[protocol.ContactRequestReceivedPayload]{
 				Type:      envelope.Type,
 				EventID:   envelope.EventID,
 				RequestID: envelope.RequestID,
@@ -198,13 +198,13 @@ func (c *Client) handleIncoming(data []byte) error {
 				Payload:   payload,
 			})
 		}
-	case protocol.EventFriendRequestAccepted:
-		var payload protocol.FriendRequestAcceptedPayload
+	case protocol.EventContactRequestAccepted:
+		var payload protocol.ContactRequestAcceptedPayload
 		if err := json.Unmarshal(envelope.Payload, &payload); err != nil {
-			return fmt.Errorf("decode friend_request.accepted payload: %w", err)
+			return fmt.Errorf("decode contact_request.accepted payload: %w", err)
 		}
-		if c.handlers.OnFriendRequestAccepted != nil {
-			c.handlers.OnFriendRequestAccepted(protocol.Envelope[protocol.FriendRequestAcceptedPayload]{
+		if c.handlers.OnContactRequestAccepted != nil {
+			c.handlers.OnContactRequestAccepted(protocol.Envelope[protocol.ContactRequestAcceptedPayload]{
 				Type:      envelope.Type,
 				EventID:   envelope.EventID,
 				RequestID: envelope.RequestID,
@@ -212,13 +212,13 @@ func (c *Client) handleIncoming(data []byte) error {
 				Payload:   payload,
 			})
 		}
-	case protocol.EventFriendRequestRejected:
-		var payload protocol.FriendRequestRejectedPayload
+	case protocol.EventContactRequestRejected:
+		var payload protocol.ContactRequestRejectedPayload
 		if err := json.Unmarshal(envelope.Payload, &payload); err != nil {
-			return fmt.Errorf("decode friend_request.rejected payload: %w", err)
+			return fmt.Errorf("decode contact_request.rejected payload: %w", err)
 		}
-		if c.handlers.OnFriendRequestRejected != nil {
-			c.handlers.OnFriendRequestRejected(protocol.Envelope[protocol.FriendRequestRejectedPayload]{
+		if c.handlers.OnContactRequestRejected != nil {
+			c.handlers.OnContactRequestRejected(protocol.Envelope[protocol.ContactRequestRejectedPayload]{
 				Type:      envelope.Type,
 				EventID:   envelope.EventID,
 				RequestID: envelope.RequestID,
@@ -273,6 +273,6 @@ func (c *Client) clearConnection(conn *websocket.Conn) {
 	if c.conn == conn {
 		c.conn = nil
 		c.userID = ""
-		c.friendCode = ""
+		c.contactCode = ""
 	}
 }

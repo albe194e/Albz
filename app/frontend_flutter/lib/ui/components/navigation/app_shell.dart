@@ -1,26 +1,40 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_scope.dart';
+import '../../theme/responsive.dart';
 import 'app_nav_rail.dart';
+import 'mobile_app_drawer.dart';
 
 class AppShell extends StatelessWidget {
-  const AppShell({super.key, required this.child});
+  const AppShell({super.key, required this.child, this.navRailOverlapTop = 0});
 
   final Widget child;
+  final double navRailOverlapTop;
 
   @override
   Widget build(BuildContext context) {
+    final controller = AppScope.of(context);
     final width = MediaQuery.sizeOf(context).width;
 
-    if (width < 900) {
-      return child;
+    if (!AppBreakpoints.showNavRail(width)) {
+      return Stack(
+        children: [
+          child,
+          if (controller.mobileNavOpen) const MobileAppDrawer(),
+        ],
+      );
     }
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Stack(
+      clipBehavior: Clip.none,
       children: [
-        const AppNavRail(),
-        const SizedBox(width: 12),
-        Expanded(child: child),
+        Positioned(
+          left: 0,
+          top: -navRailOverlapTop,
+          bottom: 0,
+          child: const AppNavRail(),
+        ),
+        Positioned.fill(left: 90, child: child),
       ],
     );
   }

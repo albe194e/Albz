@@ -12,8 +12,8 @@ type AppState struct {
 	CurrentUser          *sql.User
 	Messages             []sql.Message
 	Conversations        []sql.Conversation
-	Friends              []sql.Friend
-	FriendRequests       []sql.FriendRequest
+	Contacts             []sql.Contact
+	ContactRequests      []sql.ContactRequest
 	LoadedConversationID string
 	ServerConnected      bool
 	LastNetworkError     string
@@ -29,19 +29,19 @@ func (s *AppState) InitStateFromDB(ctx context.Context, store *storage.Store) er
 		return err
 	}
 
-	friends, err := store.Q.ListFriends(ctx)
+	contacts, err := store.Q.ListContacts(ctx)
 	if err != nil {
 		return err
 	}
 
-	friendRequests, err := store.Q.ListFriendRequests(ctx)
+	contactRequests, err := store.Q.ListContactRequests(ctx)
 	if err != nil {
 		return err
 	}
 
 	s.Conversations = convs
-	s.Friends = friends
-	s.FriendRequests = friendRequests
+	s.Contacts = contacts
+	s.ContactRequests = contactRequests
 	s.Messages = nil
 	s.LoadedConversationID = ""
 	return nil

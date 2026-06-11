@@ -4,21 +4,21 @@ This document describes the current data storage and transmission behavior in th
 
 ## Local data stored on the client
 
-The current desktop app stores its local SQLite database under:
+The current Flutter client stores its local SQLite database under:
 
 - default desktop path: `dev-local-db/local_storage/albz.db`
 - named desktop development profiles: `dev-local-db/local_storage/profiles/<profile>/albz.db`
-- Android path: the app storage root plus `dev-local-db/local_storage/albz.db`
+- Android path: the app support storage root plus `dev-local-db/local_storage/albz.db`
 
 The local schema currently stores:
 
-- `users`: local account records, including `id`, `name`, `username`, `friend_code`, `profile_picture_url`, and the value stored in `hashed_password`
+- `users`: local account records, including `id`, `name`, `username`, `contact_code`, `profile_picture_url`, and the value stored in `hashed_password`
 - `sessions`: the active local session identifier, linked user, creation time, and expiry time
 - `conversations`: local conversation identifiers and names
 - `messages`: local message history, sender identifiers, client message identifiers, timestamps, and delivery state
 - `conversation_participants`: local conversation membership data
-- `friends`: accepted friend records, including names, usernames, friend codes, `profile_picture_url`, and creation times
-- `friend_requests`: pending friend requests, including sender identifiers, names, usernames, friend codes, and creation times
+- `contacts`: accepted contact records, including names, usernames, contact codes, `profile_picture_url`, and creation times
+- `contact_requests`: pending contact requests, including sender identifiers, names, usernames, contact codes, and creation times
 
 If a user selects a profile picture during registration, the image file itself is also stored locally on the device in an `images/` directory under the same local client data directory that holds the SQLite database. The `users.profile_picture_url` value points to that local file path.
 
@@ -34,7 +34,7 @@ The server currently keeps in memory:
 
 - the active WebSocket connection for a connected user
 - the connected user's `user_id`
-- the connected user's `friend_code`
+- the connected user's `contact_code`
 
 That in-memory routing state is removed when the client disconnects or the server process stops.
 
@@ -44,8 +44,8 @@ The server relays live WebSocket events between connected clients. Those events 
 
 - message bodies, conversation identifiers, and recipient user identifiers during `message.send` / `message.created`
 - conversation creation events, including the selected participant user identifiers and any explicitly chosen conversation name
-- friend request events
-- friend request acceptance and rejection events
+- contact request events
+- contact request acceptance and rejection events
 
 The server needs to see enough event data to route it to the intended connected recipient in the current implementation.
 
@@ -55,8 +55,8 @@ The current relay server does not durably store:
 
 - message history
 - conversation history
-- friend lists
-- friend requests
+- contact lists
+- contact requests
 - profile databases
 - profile picture files
 - local SQLite contents
@@ -70,10 +70,10 @@ Local SQLite data is stored locally on disk and is not encrypted by this codebas
 
 Network transport depends on the configured WebSocket URL:
 
-- default development URL: `ws://localhost:8080/ws`
+- current code default: `wss://oncological-paroxysmal-karolyn.ngrok-free.dev/ws`
 - optional override: `ALBZ_SERVER_WS_URL`
 
-The default development URL is plain WebSocket, not TLS-protected transport. If a `wss://...` URL is configured, transport encryption depends on that deployment.
+The current code default uses `wss://`, so transport encryption depends on that deployment. If this is overridden with a `ws://...` URL during development, that override uses plain WebSocket without TLS.
 
 ## Current versus future behavior
 

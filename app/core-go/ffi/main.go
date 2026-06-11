@@ -336,14 +336,14 @@ func core_send_message(handle C.uint64_t, conversationID *C.char, body *C.char) 
 }
 
 //export core_start_direct_conversation
-func core_start_direct_conversation(handle C.uint64_t, friendUserID *C.char) *C.char {
+func core_start_direct_conversation(handle C.uint64_t, contactUserID *C.char) *C.char {
 	instance, err := loadBridge(handle)
 	if err != nil {
 		lastError.set(err)
 		return nil
 	}
 
-	conversationID, err := instance.StartDirectConversation(goString(friendUserID))
+	conversationID, err := instance.StartDirectConversation(goString(contactUserID))
 	if err != nil {
 		lastError.set(err)
 		return nil
@@ -379,15 +379,15 @@ func core_create_conversation(handle C.uint64_t, name *C.char, participantUserID
 	return cString(conversationID)
 }
 
-//export core_send_friend_request
-func core_send_friend_request(handle C.uint64_t, friendCode *C.char) C.int {
+//export core_send_contact_request
+func core_send_contact_request(handle C.uint64_t, contactCode *C.char) C.int {
 	instance, err := loadBridge(handle)
 	if err != nil {
 		lastError.set(err)
 		return C.int(0)
 	}
 
-	if err := instance.SendFriendRequest(goString(friendCode)); err != nil {
+	if err := instance.SendContactRequest(goString(contactCode)); err != nil {
 		lastError.set(err)
 		return C.int(0)
 	}
@@ -396,15 +396,15 @@ func core_send_friend_request(handle C.uint64_t, friendCode *C.char) C.int {
 	return C.int(1)
 }
 
-//export core_accept_friend_request
-func core_accept_friend_request(handle C.uint64_t, fromUserID *C.char) C.int {
+//export core_accept_contact_request
+func core_accept_contact_request(handle C.uint64_t, fromUserID *C.char) C.int {
 	instance, err := loadBridge(handle)
 	if err != nil {
 		lastError.set(err)
 		return C.int(0)
 	}
 
-	if err := instance.AcceptFriendRequest(goString(fromUserID)); err != nil {
+	if err := instance.AcceptContactRequest(goString(fromUserID)); err != nil {
 		lastError.set(err)
 		return C.int(0)
 	}
@@ -413,15 +413,15 @@ func core_accept_friend_request(handle C.uint64_t, fromUserID *C.char) C.int {
 	return C.int(1)
 }
 
-//export core_reject_friend_request
-func core_reject_friend_request(handle C.uint64_t, fromUserID *C.char) C.int {
+//export core_reject_contact_request
+func core_reject_contact_request(handle C.uint64_t, fromUserID *C.char) C.int {
 	instance, err := loadBridge(handle)
 	if err != nil {
 		lastError.set(err)
 		return C.int(0)
 	}
 
-	if err := instance.RejectFriendRequest(goString(fromUserID)); err != nil {
+	if err := instance.RejectContactRequest(goString(fromUserID)); err != nil {
 		lastError.set(err)
 		return C.int(0)
 	}

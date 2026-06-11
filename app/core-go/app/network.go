@@ -15,7 +15,7 @@ func (c *Controller) ConnectToServer(ctx context.Context) error {
 		return nil
 	}
 
-	if err := c.Net.Connect(c.State.CurrentUser.ID, c.State.CurrentUser.FriendCode); err != nil {
+	if err := c.Net.Connect(c.State.CurrentUser.ID, c.State.CurrentUser.ContactCode); err != nil {
 		c.State.ServerConnected = false
 		c.State.LastNetworkError = err.Error()
 		c.notifyStateChanged()
@@ -106,20 +106,20 @@ func (c *Controller) HandleMessageDelivery(event protocol.Envelope[protocol.Mess
 	c.notifyStateChanged()
 }
 
-func (c *Controller) HandleFriendRequestReceived(event protocol.Envelope[protocol.FriendRequestReceivedPayload]) {
+func (c *Controller) HandleContactRequestReceived(event protocol.Envelope[protocol.ContactRequestReceivedPayload]) {
 	if c == nil || c.Store == nil {
 		return
 	}
 
-	err := c.Store.Q.UpsertFriendRequest(context.Background(), sql.UpsertFriendRequestParams{
-		FromUserID:     event.Payload.FromProfile.UserID,
-		Name:           event.Payload.FromProfile.Name,
-		Username:       event.Payload.FromProfile.Username,
-		FromFriendCode: event.Payload.FromProfile.FriendCode,
-		CreatedAt:      event.Timestamp,
+	err := c.Store.Q.UpsertContactRequest(context.Background(), sql.UpsertContactRequestParams{
+		FromUserID:      event.Payload.FromProfile.UserID,
+		Name:            event.Payload.FromProfile.Name,
+		Username:        event.Payload.FromProfile.Username,
+		FromContactCode: event.Payload.FromProfile.ContactCode,
+		CreatedAt:       event.Timestamp,
 	})
 	if err != nil {
-		c.State.LastNetworkError = fmt.Sprintf("store friend request: %v", err)
+		c.State.LastNetworkError = fmt.Sprintf("store contact request: %v", err)
 		c.notifyStateChanged()
 		return
 	}
@@ -131,22 +131,22 @@ func (c *Controller) HandleFriendRequestReceived(event protocol.Envelope[protoco
 	c.notifyStateChanged()
 }
 
-func (c *Controller) HandleFriendRequestAccepted(event protocol.Envelope[protocol.FriendRequestAcceptedPayload]) {
+func (c *Controller) HandleContactRequestAccepted(event protocol.Envelope[protocol.ContactRequestAcceptedPayload]) {
 	if c == nil || c.Store == nil {
 		return
 	}
 
 	profile := event.Payload.Profile
 	if profile.UserID == "" {
-		c.State.LastNetworkError = "accepted friend is missing user ID"
+		c.State.LastNetworkError = "accepted contact is missing user ID"
 		c.notifyStateChanged()
 		return
 	}
 
-	if profile.Name == "" || profile.Username == "" || profile.FriendCode == "" {
-		request, err := c.findFriendRequestByUserID(profile.UserID)
+	if profile.Name == "" || profile.Username == "" || profile.ContactCode == "" {
+		request, err := c.findContactRequestByUserID(profile.UserID)
 		if err != nil {
-			c.State.LastNetworkError = fmt.Sprintf("load accepted friend request: %v", err)
+			c.State.LastNetworkError = fmt.Sprintf("load accepted contact request: %v", err)
 			c.notifyStateChanged()
 			return
 		}
@@ -157,26 +157,26 @@ func (c *Controller) HandleFriendRequestAccepted(event protocol.Envelope[protoco
 			if profile.Username == "" {
 				profile.Username = request.Username
 			}
-			if profile.FriendCode == "" {
-				profile.FriendCode = request.FromFriendCode
+			if profile.ContactCode == "" {
+				profile.ContactCode = request.FromContactCode
 			}
 		}
 	}
 
-	if err := c.Store.Q.UpsertFriend(context.Background(), sql.UpsertFriendParams{
+	if err := c.Store.Q.UpsertContact(context.Background(), sql.UpsertContactParams{
 		UserID:            profile.UserID,
 		Name:              profile.Name,
 		Username:          profile.Username,
 		ProfilePictureUrl: "",
-		FriendCode:        profile.FriendCode,
+		ContactCode:       profile.ContactCode,
 		CreatedAt:         event.Timestamp,
 	}); err != nil {
-		c.State.LastNetworkError = fmt.Sprintf("store friend: %v", err)
+		c.State.LastNetworkError = fmt.Sprintf("store contact: %v", err)
 		c.notifyStateChanged()
 		return
 	}
 
-	_ = c.Store.Q.DeleteFriendRequestByFromUserID(context.Background(), profile.UserID)
+	_ = c.Store.Q.DeleteContactRequestByFromUserID(context.Background(), profile.UserID)
 
 	if err := c.LoadSocialState(context.Background()); err != nil {
 		c.State.LastNetworkError = fmt.Sprintf("reload social state: %v", err)
@@ -185,13 +185,13 @@ func (c *Controller) HandleFriendRequestAccepted(event protocol.Envelope[protoco
 	c.notifyStateChanged()
 }
 
-func (c *Controller) HandleFriendRequestRejected(event protocol.Envelope[protocol.FriendRequestRejectedPayload]) {
+func (c *Controller) HandleContactRequestRejected(event protocol.Envelope[protocol.ContactRequestRejectedPayload]) {
 	if c == nil || c.Store == nil {
 		return
 	}
 
-	if err := c.Store.Q.DeleteFriendRequestByFromUserID(context.Background(), event.Payload.UserID); err != nil {
-		c.State.LastNetworkError = fmt.Sprintf("delete rejected friend request: %v", err)
+	if err := c.Store.Q.DeleteContactRequestByFromUserID(context.Background(), event.Payload.UserID); err != nil {
+		c.State.LastNetworkError = fmt.Sprintf("delete rejected contact request: %v", err)
 		c.notifyStateChanged()
 		return
 	}
@@ -224,12 +224,12 @@ func (c *Controller) HandleDisconnect(err error) {
 	c.notifyStateChanged()
 }
 
-func (c *Controller) findFriendRequestByUserID(userID string) (*sql.FriendRequest, error) {
+func (c *Controller) findContactRequestByUserID(userID string) (*sql.ContactRequest, error) {
 	if c == nil || c.Store == nil {
 		return nil, nil
 	}
 
-	requests, err := c.Store.Q.ListFriendRequests(context.Background())
+	requests, err := c.Store.Q.ListContactRequests(context.Background())
 	if err != nil {
 		return nil, err
 	}

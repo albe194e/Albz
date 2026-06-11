@@ -111,7 +111,7 @@ func (s *relayServer) handleConversationCreate(client *clientConn, envelope rawE
 			ConversationName:   payload.ConversationName,
 			ParticipantUserIDs: participantUserIDs,
 			FromUserID:         client.userID,
-			FromFriendCode:     client.friendCode,
+			FromContactCode:    client.contactCode,
 		},
 	}
 
@@ -154,51 +154,51 @@ func normalizeRecipientUserIDs(senderUserID string, userIDs []string) ([]string,
 	return normalized, nil
 }
 
-func (s *relayServer) handleFriendRequestSend(client *clientConn, envelope rawEnvelope) error {
-	var payload protocol.FriendRequestSendPayload
+func (s *relayServer) handleContactRequestSend(client *clientConn, envelope rawEnvelope) error {
+	var payload protocol.ContactRequestSendPayload
 	if err := json.Unmarshal(envelope.Payload, &payload); err != nil {
-		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, "invalid friend_request.send payload")
+		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, "invalid contact_request.send payload")
 	}
 
-	if strings.TrimSpace(payload.FriendCode) == "" {
-		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, "friend code is required")
+	if strings.TrimSpace(payload.ContactCode) == "" {
+		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, "contact code is required")
 	}
 	if strings.TrimSpace(payload.FromProfile.Name) == "" || strings.TrimSpace(payload.FromProfile.Username) == "" {
 		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, "sender profile is required")
 	}
-	if payload.FriendCode == client.friendCode {
-		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidRecipient, "cannot send a friend request to yourself")
+	if payload.ContactCode == client.contactCode {
+		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidRecipient, "cannot send a contact request to yourself")
 	}
 
-	recipient := s.getClientByFriendCode(payload.FriendCode)
+	recipient := s.getClientByContactCode(payload.ContactCode)
 	if recipient == nil {
-		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeFriendCodeNotFound, "friend code is not currently online")
+		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeContactCodeNotFound, "contact code is not currently online")
 	}
 
-	if err := recipient.writeJSON(protocol.Envelope[protocol.FriendRequestReceivedPayload]{
-		Type:      protocol.EventFriendRequestReceived,
+	if err := recipient.writeJSON(protocol.Envelope[protocol.ContactRequestReceivedPayload]{
+		Type:      protocol.EventContactRequestReceived,
 		EventID:   newID(),
 		RequestID: envelope.RequestID,
 		Timestamp: time.Now().Unix(),
-		Payload: protocol.FriendRequestReceivedPayload{
-			FromProfile: protocol.PublicFriendProfile{
-				UserID:     client.userID,
-				FriendCode: client.friendCode,
-				Name:       payload.FromProfile.Name,
-				Username:   payload.FromProfile.Username,
+		Payload: protocol.ContactRequestReceivedPayload{
+			FromProfile: protocol.PublicContactProfile{
+				UserID:      client.userID,
+				ContactCode: client.contactCode,
+				Name:        payload.FromProfile.Name,
+				Username:    payload.FromProfile.Username,
 			},
 		},
 	}); err != nil {
-		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeFriendCodeNotFound, "friend code is not currently online")
+		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeContactCodeNotFound, "contact code is not currently online")
 	}
 
 	return nil
 }
 
-func (s *relayServer) handleFriendRequestAccept(client *clientConn, envelope rawEnvelope) error {
-	var payload protocol.FriendRequestAcceptPayload
+func (s *relayServer) handleContactRequestAccept(client *clientConn, envelope rawEnvelope) error {
+	var payload protocol.ContactRequestAcceptPayload
 	if err := json.Unmarshal(envelope.Payload, &payload); err != nil {
-		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, "invalid friend_request.accept payload")
+		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, "invalid contact_request.accept payload")
 	}
 	if strings.TrimSpace(payload.FromUserID) == "" {
 		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, "from_user_id is required")
@@ -212,17 +212,17 @@ func (s *relayServer) handleFriendRequestAccept(client *clientConn, envelope raw
 		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeRecipientOffline, "requester is not currently online")
 	}
 
-	requesterEvent := protocol.Envelope[protocol.FriendRequestAcceptedPayload]{
-		Type:      protocol.EventFriendRequestAccepted,
+	requesterEvent := protocol.Envelope[protocol.ContactRequestAcceptedPayload]{
+		Type:      protocol.EventContactRequestAccepted,
 		EventID:   newID(),
 		RequestID: envelope.RequestID,
 		Timestamp: time.Now().Unix(),
-		Payload: protocol.FriendRequestAcceptedPayload{
-			Profile: protocol.PublicFriendProfile{
-				UserID:     client.userID,
-				FriendCode: client.friendCode,
-				Name:       payload.AcceptProfile.Name,
-				Username:   payload.AcceptProfile.Username,
+		Payload: protocol.ContactRequestAcceptedPayload{
+			Profile: protocol.PublicContactProfile{
+				UserID:      client.userID,
+				ContactCode: client.contactCode,
+				Name:        payload.AcceptProfile.Name,
+				Username:    payload.AcceptProfile.Username,
 			},
 		},
 	}
@@ -230,24 +230,24 @@ func (s *relayServer) handleFriendRequestAccept(client *clientConn, envelope raw
 		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeRecipientOffline, "requester is not currently online")
 	}
 
-	return client.writeJSON(protocol.Envelope[protocol.FriendRequestAcceptedPayload]{
-		Type:      protocol.EventFriendRequestAccepted,
+	return client.writeJSON(protocol.Envelope[protocol.ContactRequestAcceptedPayload]{
+		Type:      protocol.EventContactRequestAccepted,
 		EventID:   newID(),
 		RequestID: envelope.RequestID,
 		Timestamp: time.Now().Unix(),
-		Payload: protocol.FriendRequestAcceptedPayload{
-			Profile: protocol.PublicFriendProfile{
-				UserID:     requester.userID,
-				FriendCode: requester.friendCode,
+		Payload: protocol.ContactRequestAcceptedPayload{
+			Profile: protocol.PublicContactProfile{
+				UserID:      requester.userID,
+				ContactCode: requester.contactCode,
 			},
 		},
 	})
 }
 
-func (s *relayServer) handleFriendRequestReject(client *clientConn, envelope rawEnvelope) error {
-	var payload protocol.FriendRequestRejectPayload
+func (s *relayServer) handleContactRequestReject(client *clientConn, envelope rawEnvelope) error {
+	var payload protocol.ContactRequestRejectPayload
 	if err := json.Unmarshal(envelope.Payload, &payload); err != nil {
-		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, "invalid friend_request.reject payload")
+		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, "invalid contact_request.reject payload")
 	}
 	if strings.TrimSpace(payload.FromUserID) == "" {
 		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeInvalidMessage, "from_user_id is required")
@@ -258,12 +258,12 @@ func (s *relayServer) handleFriendRequestReject(client *clientConn, envelope raw
 		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeRecipientOffline, "requester is not currently online")
 	}
 
-	requesterEvent := protocol.Envelope[protocol.FriendRequestRejectedPayload]{
-		Type:      protocol.EventFriendRequestRejected,
+	requesterEvent := protocol.Envelope[protocol.ContactRequestRejectedPayload]{
+		Type:      protocol.EventContactRequestRejected,
 		EventID:   newID(),
 		RequestID: envelope.RequestID,
 		Timestamp: time.Now().Unix(),
-		Payload: protocol.FriendRequestRejectedPayload{
+		Payload: protocol.ContactRequestRejectedPayload{
 			UserID: client.userID,
 		},
 	}
@@ -271,12 +271,12 @@ func (s *relayServer) handleFriendRequestReject(client *clientConn, envelope raw
 		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeRecipientOffline, "requester is not currently online")
 	}
 
-	return client.writeJSON(protocol.Envelope[protocol.FriendRequestRejectedPayload]{
-		Type:      protocol.EventFriendRequestRejected,
+	return client.writeJSON(protocol.Envelope[protocol.ContactRequestRejectedPayload]{
+		Type:      protocol.EventContactRequestRejected,
 		EventID:   newID(),
 		RequestID: envelope.RequestID,
 		Timestamp: time.Now().Unix(),
-		Payload: protocol.FriendRequestRejectedPayload{
+		Payload: protocol.ContactRequestRejectedPayload{
 			UserID: requester.userID,
 		},
 	})

@@ -20,25 +20,25 @@ func (c *Client) CreateConversation(requestID string, payload protocol.Conversat
 	})
 }
 
-func (c *Client) SendFriendRequest(requestID string, payload protocol.FriendRequestSendPayload) error {
-	return c.writeJSON(protocol.Envelope[protocol.FriendRequestSendPayload]{
-		Type:      protocol.EventFriendRequestSend,
+func (c *Client) SendContactRequest(requestID string, payload protocol.ContactRequestSendPayload) error {
+	return c.writeJSON(protocol.Envelope[protocol.ContactRequestSendPayload]{
+		Type:      protocol.EventContactRequestSend,
 		RequestID: requestID,
 		Payload:   payload,
 	})
 }
 
-func (c *Client) AcceptFriendRequest(requestID string, payload protocol.FriendRequestAcceptPayload) error {
-	return c.writeJSON(protocol.Envelope[protocol.FriendRequestAcceptPayload]{
-		Type:      protocol.EventFriendRequestAccept,
+func (c *Client) AcceptContactRequest(requestID string, payload protocol.ContactRequestAcceptPayload) error {
+	return c.writeJSON(protocol.Envelope[protocol.ContactRequestAcceptPayload]{
+		Type:      protocol.EventContactRequestAccept,
 		RequestID: requestID,
 		Payload:   payload,
 	})
 }
 
-func (c *Client) RejectFriendRequest(requestID string, payload protocol.FriendRequestRejectPayload) error {
-	return c.writeJSON(protocol.Envelope[protocol.FriendRequestRejectPayload]{
-		Type:      protocol.EventFriendRequestReject,
+func (c *Client) RejectContactRequest(requestID string, payload protocol.ContactRequestRejectPayload) error {
+	return c.writeJSON(protocol.Envelope[protocol.ContactRequestRejectPayload]{
+		Type:      protocol.EventContactRequestReject,
 		RequestID: requestID,
 		Payload:   payload,
 	})

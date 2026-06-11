@@ -25,16 +25,16 @@ var upgrader = websocket.Upgrader{
 }
 
 type relayServer struct {
-	mu                  sync.RWMutex
-	clientsByUserID     map[string]*clientConn
-	clientsByFriendCode map[string]*clientConn
+	mu                   sync.RWMutex
+	clientsByUserID      map[string]*clientConn
+	clientsByContactCode map[string]*clientConn
 }
 
 type clientConn struct {
-	userID     string
-	friendCode string
-	conn       *websocket.Conn
-	writeM     sync.Mutex
+	userID      string
+	contactCode string
+	conn        *websocket.Conn
+	writeM      sync.Mutex
 }
 
 type rawEnvelope struct {
@@ -50,8 +50,8 @@ func main() {
 	}
 
 	server := &relayServer{
-		clientsByUserID:     make(map[string]*clientConn),
-		clientsByFriendCode: make(map[string]*clientConn),
+		clientsByUserID:      make(map[string]*clientConn),
+		clientsByContactCode: make(map[string]*clientConn),
 	}
 
 	mux := http.NewServeMux()
@@ -69,13 +69,13 @@ func handleHealth(w http.ResponseWriter, _ *http.Request) {
 
 func (s *relayServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	userID := strings.TrimSpace(r.URL.Query().Get("user_id"))
-	friendCode := strings.TrimSpace(r.URL.Query().Get("friend_code"))
+	contactCode := strings.TrimSpace(r.URL.Query().Get("contact_code"))
 	if userID == "" {
 		http.Error(w, "missing user_id", http.StatusBadRequest)
 		return
 	}
-	if friendCode == "" {
-		http.Error(w, "missing friend_code", http.StatusBadRequest)
+	if contactCode == "" {
+		http.Error(w, "missing contact_code", http.StatusBadRequest)
 		return
 	}
 
@@ -85,9 +85,9 @@ func (s *relayServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := &clientConn{
-		userID:     userID,
-		friendCode: friendCode,
-		conn:       conn,
+		userID:      userID,
+		contactCode: contactCode,
+		conn:        conn,
 	}
 
 	for _, previous := range s.registerClient(client) {
@@ -127,10 +127,10 @@ func (s *relayServer) registerClient(client *clientConn) []*clientConn {
 	}
 
 	appendPrevious(s.clientsByUserID[client.userID])
-	appendPrevious(s.clientsByFriendCode[client.friendCode])
+	appendPrevious(s.clientsByContactCode[client.contactCode])
 
 	s.clientsByUserID[client.userID] = client
-	s.clientsByFriendCode[client.friendCode] = client
+	s.clientsByContactCode[client.contactCode] = client
 
 	return previous
 }
@@ -142,8 +142,8 @@ func (s *relayServer) unregisterClient(client *clientConn) {
 	if current, ok := s.clientsByUserID[client.userID]; ok && current == client {
 		delete(s.clientsByUserID, client.userID)
 	}
-	if current, ok := s.clientsByFriendCode[client.friendCode]; ok && current == client {
-		delete(s.clientsByFriendCode, client.friendCode)
+	if current, ok := s.clientsByContactCode[client.contactCode]; ok && current == client {
+		delete(s.clientsByContactCode, client.contactCode)
 	}
 }
 
@@ -163,12 +163,12 @@ func (s *relayServer) readAndHandleMessage(client *clientConn) error {
 		return s.handleMessageSend(client, envelope)
 	case protocol.EventConversationCreate:
 		return s.handleConversationCreate(client, envelope)
-	case protocol.EventFriendRequestSend:
-		return s.handleFriendRequestSend(client, envelope)
-	case protocol.EventFriendRequestAccept:
-		return s.handleFriendRequestAccept(client, envelope)
-	case protocol.EventFriendRequestReject:
-		return s.handleFriendRequestReject(client, envelope)
+	case protocol.EventContactRequestSend:
+		return s.handleContactRequestSend(client, envelope)
+	case protocol.EventContactRequestAccept:
+		return s.handleContactRequestAccept(client, envelope)
+	case protocol.EventContactRequestReject:
+		return s.handleContactRequestReject(client, envelope)
 	default:
 		return s.sendError(client, envelope.RequestID, protocol.ErrorCodeUnsupported, "unsupported event type")
 	}
@@ -197,11 +197,11 @@ func (s *relayServer) getClientsByUserIDs(userIDs []string) []*clientConn {
 	return clients
 }
 
-func (s *relayServer) getClientByFriendCode(friendCode string) *clientConn {
+func (s *relayServer) getClientByContactCode(contactCode string) *clientConn {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.clientsByFriendCode[friendCode]
+	return s.clientsByContactCode[contactCode]
 }
 
 func (s *relayServer) sendError(client *clientConn, requestID, code, message string) error {

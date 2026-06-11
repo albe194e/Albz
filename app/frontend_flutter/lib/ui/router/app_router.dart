@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/app_controller.dart';
 import '../../app/app_page.dart';
 import '../pages/chat_page.dart';
+import '../pages/contact_page.dart';
 import '../pages/landing_page.dart';
 import '../pages/login_page.dart';
 import '../pages/profile_page.dart';
@@ -26,6 +27,8 @@ class AppRouter extends StatelessWidget {
         return const ChatPage();
       case AppPage.profile:
         return const ProfilePage();
+      case AppPage.contacts:
+        return const ContactPage();
     }
   }
 }

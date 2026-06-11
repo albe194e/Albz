@@ -15,23 +15,23 @@ type ConversationParticipant struct {
 	ParticipantID  string `db:"participant_id" json:"participant_id"`
 }
 
-type Friend struct {
+type Contact struct {
 	ID                int64  `db:"id" json:"id"`
 	UserID            string `db:"user_id" json:"user_id"`
 	Name              string `db:"name" json:"name"`
 	Username          string `db:"username" json:"username"`
 	ProfilePictureUrl string `db:"profile_picture_url" json:"profile_picture_url"`
-	FriendCode        string `db:"friend_code" json:"friend_code"`
+	ContactCode       string `db:"contact_code" json:"contact_code"`
 	CreatedAt         int64  `db:"created_at" json:"created_at"`
 }
 
-type FriendRequest struct {
-	ID             int64  `db:"id" json:"id"`
-	FromUserID     string `db:"from_user_id" json:"from_user_id"`
-	Name           string `db:"name" json:"name"`
-	Username       string `db:"username" json:"username"`
-	FromFriendCode string `db:"from_friend_code" json:"from_friend_code"`
-	CreatedAt      int64  `db:"created_at" json:"created_at"`
+type ContactRequest struct {
+	ID              int64  `db:"id" json:"id"`
+	FromUserID      string `db:"from_user_id" json:"from_user_id"`
+	Name            string `db:"name" json:"name"`
+	Username        string `db:"username" json:"username"`
+	FromContactCode string `db:"from_contact_code" json:"from_contact_code"`
+	CreatedAt       int64  `db:"created_at" json:"created_at"`
 }
 
 type Message struct {
@@ -58,5 +58,5 @@ type User struct {
 	Username          string `db:"username" json:"username"`
 	HashedPassword    string `db:"hashed_password" json:"hashed_password"`
 	ProfilePictureUrl string `db:"profile_picture_url" json:"profile_picture_url"`
-	FriendCode        string `db:"friend_code" json:"friend_code"`
+	ContactCode       string `db:"contact_code" json:"contact_code"`
 }

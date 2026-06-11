@@ -29,13 +29,13 @@ func (b *Bridge) CreateConversation(name string, participantUserIDs []string) (s
 	return conversation.ID, nil
 }
 
-func (b *Bridge) StartDirectConversation(friendUserID string) (string, error) {
-	friend := b.controller().FindFriendByUserID(friendUserID)
-	if friend == nil {
-		return "", fmt.Errorf("friend %q was not found", friendUserID)
+func (b *Bridge) StartDirectConversation(contactUserID string) (string, error) {
+	contact := b.controller().FindContactByUserID(contactUserID)
+	if contact == nil {
+		return "", fmt.Errorf("contact %q was not found", contactUserID)
 	}
 
-	conversation, err := b.controller().CreateConversationWithFriend(context.Background(), *friend)
+	conversation, err := b.controller().CreateConversationWithContact(context.Background(), *contact)
 	if err != nil {
 		return "", err
 	}

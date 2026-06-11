@@ -59,12 +59,12 @@ func (c *Controller) CreateConversationWithUsers(ctx context.Context, name strin
 	return conversation, nil
 }
 
-func (c *Controller) CreateConversationWithFriend(ctx context.Context, friend sql.Friend) (sql.Conversation, error) {
+func (c *Controller) CreateConversationWithContact(ctx context.Context, contact sql.Contact) (sql.Conversation, error) {
 	if c == nil || c.State == nil || c.State.CurrentUser == nil {
 		return sql.Conversation{}, fmt.Errorf("no current user")
 	}
 
-	existing, err := c.findDirectConversationWithUser(ctx, friend.UserID)
+	existing, err := c.findDirectConversationWithUser(ctx, contact.UserID)
 	if err != nil {
 		return sql.Conversation{}, err
 	}
@@ -72,7 +72,7 @@ func (c *Controller) CreateConversationWithFriend(ctx context.Context, friend sq
 		return *existing, nil
 	}
 
-	return c.CreateConversationWithFriends(ctx, "", friend)
+	return c.CreateConversationWithContacts(ctx, "", contact)
 }
 
 func (c *Controller) HandleConversationCreated(event protocol.Envelope[protocol.ConversationCreatedPayload]) {
@@ -100,17 +100,17 @@ func (c *Controller) HandleConversationCreated(event protocol.Envelope[protocol.
 	c.notifyStateChanged()
 }
 
-func (c *Controller) CreateConversationWithFriends(ctx context.Context, name string, friends ...sql.Friend) (sql.Conversation, error) {
+func (c *Controller) CreateConversationWithContacts(ctx context.Context, name string, contacts ...sql.Contact) (sql.Conversation, error) {
 	if c == nil || c.State == nil || c.State.CurrentUser == nil {
 		return sql.Conversation{}, fmt.Errorf("no current user")
 	}
-	if len(friends) == 0 {
-		return sql.Conversation{}, fmt.Errorf("at least one friend is required")
+	if len(contacts) == 0 {
+		return sql.Conversation{}, fmt.Errorf("at least one contact is required")
 	}
 
-	userIDs := make([]string, 0, len(friends))
-	for _, friend := range friends {
-		userIDs = append(userIDs, friend.UserID)
+	userIDs := make([]string, 0, len(contacts))
+	for _, contact := range contacts {
+		userIDs = append(userIDs, contact.UserID)
 	}
 
 	participantUserIDs, recipientUserIDs, err := c.normalizeConversationParticipantIDs(userIDs...)
@@ -130,9 +130,9 @@ func (c *Controller) CreateConversationWithFriends(ctx context.Context, name str
 }
 
 func (c *Controller) displayNameForConversationCreator(userID string, fallback string) string {
-	friend := c.findFriendByUserID(userID)
-	if friend != nil {
-		return FriendDisplayName(*friend)
+	contact := c.findContactByUserID(userID)
+	if contact != nil {
+		return ContactDisplayName(*contact)
 	}
 
 	if strings.TrimSpace(fallback) != "" {

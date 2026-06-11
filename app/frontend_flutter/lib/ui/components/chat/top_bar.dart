@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/app_scope.dart';
+import '../../theme/responsive.dart';
 
 class ChatTopBar extends StatelessWidget {
   const ChatTopBar({super.key, required this.mobile});
@@ -10,17 +11,26 @@ class ChatTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
+    final width = MediaQuery.sizeOf(context).width;
+    final narrow = AppBreakpoints.isNarrow(width);
+    final showingConversationList = mobile && controller.sidebarOpen;
 
     return SizedBox(
-      height: 68,
+      height: narrow ? 64 : 68,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18),
+        padding: EdgeInsets.symmetric(horizontal: narrow ? 14 : 18),
         child: Row(
           children: [
             if (mobile)
               IconButton(
-                onPressed: controller.toggleSidebar,
-                icon: const Icon(Icons.menu_rounded),
+                onPressed: showingConversationList
+                    ? controller.toggleMobileNav
+                    : controller.showConversationList,
+                icon: Icon(
+                  showingConversationList
+                      ? Icons.menu_rounded
+                      : Icons.arrow_back_rounded,
+                ),
               ),
             Expanded(
               child: Column(
@@ -28,16 +38,20 @@ class ChatTopBar extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    controller.activeConversationName,
-                    style: Theme.of(context).textTheme.titleLarge,
+                    showingConversationList
+                        ? 'Chats'
+                        : controller.activeConversationName,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontSize: narrow ? 18 : null,
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    controller.currentUser == null
-                        ? 'No active session'
-                        : 'Signed in as @${controller.currentUser!.username}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
+                  if (controller.currentUser == null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'No active session',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -1,9 +1,9 @@
--- name: UpsertFriend :exec
-INSERT INTO friends (
+-- name: UpsertContact :exec
+INSERT INTO contacts (
   user_id,
   name,
   username,
-  friend_code,
+  contact_code,
 	profile_picture_url,
   created_at
 ) VALUES (
@@ -12,11 +12,11 @@ INSERT INTO friends (
 ON CONFLICT(user_id) DO UPDATE SET
   name = excluded.name,
   username = excluded.username,
-  friend_code = excluded.friend_code,
+  contact_code = excluded.contact_code,
   profile_picture_url = excluded.profile_picture_url,
   created_at = excluded.created_at;
 
--- name: ListFriends :many
+-- name: ListContacts :many
 SELECT *
-FROM friends
+FROM contacts
 ORDER BY created_at ASC;

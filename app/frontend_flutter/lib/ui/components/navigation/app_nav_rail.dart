@@ -10,6 +10,7 @@ class AppNavRail extends StatelessWidget {
   const AppNavRail({super.key});
 
   static const _chatIconAsset = 'assets/icons/chat.svg';
+  static const _contactsIconAsset = 'assets/icons/contacts.svg';
   static const _logoAsset = 'assets/icons/icon.svg';
 
   @override
@@ -20,7 +21,7 @@ class AppNavRail extends StatelessWidget {
     return SizedBox(
       width: 78,
       child: DecoratedBox(
-        decoration: BoxDecoration(color: AppColors.navRail),
+        decoration: const BoxDecoration(color: AppColors.navRail),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 18),
           child: Column(
@@ -42,6 +43,24 @@ class AppNavRail extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: 10),
+              _RailButton(
+                selected: page == AppPage.contacts,
+                onPressed: () => controller.navigateTo(AppPage.contacts),
+                child: SvgPicture.asset(
+                  _contactsIconAsset,
+                  width: 20,
+                  height: 20,
+                  colorFilter: ColorFilter.mode(
+                    page == AppPage.contacts
+                        ? AppColors.textPrimary
+                        : AppColors.textSecondary,
+                    BlendMode.srcIn,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const _RailSeparator(),
               const Spacer(),
               _RailButton(
                 selected: page == AppPage.profile,
@@ -55,6 +74,18 @@ class AppNavRail extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _RailSeparator extends StatelessWidget {
+  const _RailSeparator();
+
+  @override
+  Widget build(BuildContext context) {
+    return FractionallySizedBox(
+      widthFactor: 0.7,
+      child: Container(height: 1, color: AppColors.borderSoft),
     );
   }
 }

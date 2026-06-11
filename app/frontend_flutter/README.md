@@ -10,7 +10,7 @@ Current status:
 - conversation and message lists render from the current core snapshot
 - local session bootstrap, login, and register are now wired
 - conversation open, group creation, start-chat, and message send are now wired
-- friend request actions, profile image upload, and event polling are now wired
+- contact request actions, profile image upload, and event polling are now wired
 
 ## Development flow
 
@@ -28,12 +28,18 @@ Current status:
 Root shortcuts:
 
 - `make run-client`
+- `make run-client-android`
 - `make run-client-profile PROFILE=alice`
 - `make run-client-alice`
 - `make run-client-bob`
 - `make run-clients`
 - `make run-dev`
 - `make reset-client-data`
+
+Android shortcut:
+
+- `make run-client-android`
+- if more than one Android target is connected: `make run-client-android DEVICE=<flutter-device-id>`
 
 The named-profile shortcuts use `--dart-define=ALBZ_PROFILE=<name>` so the Flutter app initializes `core-go` with separate local profile roots.
 
@@ -83,8 +89,8 @@ Exposed desktop proof-of-concept calls:
 - open a conversation
 - create a group conversation
 - send a message
-- start a direct conversation from a friend
-- send / accept / reject friend requests
+- start a direct conversation from a contact
+- send / accept / reject contact requests
 - save a profile image into local app storage
 - poll queued core events
 

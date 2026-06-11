@@ -3,27 +3,27 @@ package protocol
 type EventType string
 
 const (
-	EventMessageSend           EventType = "message.send"
-	EventMessageCreated        EventType = "message.created"
-	EventMessageDelivery       EventType = "message.delivery"
-	EventConversationCreate    EventType = "conversation.create"
-	EventConversationCreated   EventType = "conversation.created"
-	EventFriendRequestSend     EventType = "friend_request.send"
-	EventFriendRequestReceived EventType = "friend_request.received"
-	EventFriendRequestAccept   EventType = "friend_request.accept"
-	EventFriendRequestAccepted EventType = "friend_request.accepted"
-	EventFriendRequestReject   EventType = "friend_request.reject"
-	EventFriendRequestRejected EventType = "friend_request.rejected"
-	EventError                 EventType = "error"
+	EventMessageSend            EventType = "message.send"
+	EventMessageCreated         EventType = "message.created"
+	EventMessageDelivery        EventType = "message.delivery"
+	EventConversationCreate     EventType = "conversation.create"
+	EventConversationCreated    EventType = "conversation.created"
+	EventContactRequestSend     EventType = "contact_request.send"
+	EventContactRequestReceived EventType = "contact_request.received"
+	EventContactRequestAccept   EventType = "contact_request.accept"
+	EventContactRequestAccepted EventType = "contact_request.accepted"
+	EventContactRequestReject   EventType = "contact_request.reject"
+	EventContactRequestRejected EventType = "contact_request.rejected"
+	EventError                  EventType = "error"
 )
 
 const (
-	ErrorCodeInvalidMessage     = "invalid_message"
-	ErrorCodeUnsupported        = "unsupported_event"
-	ErrorCodeInternal           = "internal_error"
-	ErrorCodeRecipientOffline   = "recipient_offline"
-	ErrorCodeFriendCodeNotFound = "friend_code_not_found"
-	ErrorCodeInvalidRecipient   = "invalid_recipient"
+	ErrorCodeInvalidMessage      = "invalid_message"
+	ErrorCodeUnsupported         = "unsupported_event"
+	ErrorCodeInternal            = "internal_error"
+	ErrorCodeRecipientOffline    = "recipient_offline"
+	ErrorCodeContactCodeNotFound = "contact_code_not_found"
+	ErrorCodeInvalidRecipient    = "invalid_recipient"
 )
 
 type Envelope[T any] struct {
@@ -75,7 +75,7 @@ type ConversationCreatedPayload struct {
 	ConversationName   string   `json:"conversation_name,omitempty"`
 	ParticipantUserIDs []string `json:"participant_user_ids"`
 	FromUserID         string   `json:"from_user_id"`
-	FromFriendCode     string   `json:"from_friend_code"`
+	FromContactCode    string   `json:"from_contact_code"`
 }
 
 type ErrorPayload struct {
@@ -83,35 +83,35 @@ type ErrorPayload struct {
 	Message string `json:"message"`
 }
 
-type PublicFriendProfile struct {
-	UserID     string `json:"user_id,omitempty"`
-	FriendCode string `json:"friend_code"`
-	Name       string `json:"name"`
-	Username   string `json:"username"`
+type PublicContactProfile struct {
+	UserID      string `json:"user_id,omitempty"`
+	ContactCode string `json:"contact_code"`
+	Name        string `json:"name"`
+	Username    string `json:"username"`
 }
 
-type FriendRequestSendPayload struct {
-	FriendCode  string              `json:"friend_code"`
-	FromProfile PublicFriendProfile `json:"from_profile"`
+type ContactRequestSendPayload struct {
+	ContactCode string               `json:"contact_code"`
+	FromProfile PublicContactProfile `json:"from_profile"`
 }
 
-type FriendRequestReceivedPayload struct {
-	FromProfile PublicFriendProfile `json:"from_profile"`
+type ContactRequestReceivedPayload struct {
+	FromProfile PublicContactProfile `json:"from_profile"`
 }
 
-type FriendRequestAcceptPayload struct {
-	FromUserID    string              `json:"from_user_id"`
-	AcceptProfile PublicFriendProfile `json:"accept_profile"`
+type ContactRequestAcceptPayload struct {
+	FromUserID    string               `json:"from_user_id"`
+	AcceptProfile PublicContactProfile `json:"accept_profile"`
 }
 
-type FriendRequestAcceptedPayload struct {
-	Profile PublicFriendProfile `json:"profile"`
+type ContactRequestAcceptedPayload struct {
+	Profile PublicContactProfile `json:"profile"`
 }
 
-type FriendRequestRejectPayload struct {
+type ContactRequestRejectPayload struct {
 	FromUserID string `json:"from_user_id"`
 }
 
-type FriendRequestRejectedPayload struct {
+type ContactRequestRejectedPayload struct {
 	UserID string `json:"user_id"`
 }

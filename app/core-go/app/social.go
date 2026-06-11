@@ -14,22 +14,22 @@ func (c *Controller) LoadSocialState(ctx context.Context) error {
 		return nil
 	}
 
-	friends, err := c.Store.Q.ListFriends(ctx)
+	contacts, err := c.Store.Q.ListContacts(ctx)
 	if err != nil {
 		return err
 	}
 
-	friendRequests, err := c.Store.Q.ListFriendRequests(ctx)
+	contactRequests, err := c.Store.Q.ListContactRequests(ctx)
 	if err != nil {
 		return err
 	}
 
-	c.State.Friends = friends
-	c.State.FriendRequests = friendRequests
+	c.State.Contacts = contacts
+	c.State.ContactRequests = contactRequests
 	return nil
 }
 
-func (c *Controller) SendFriendRequest(ctx context.Context, friendCode string) error {
+func (c *Controller) SendContactRequest(ctx context.Context, contactCode string) error {
 	if c == nil || c.State == nil || c.State.CurrentUser == nil {
 		return fmt.Errorf("no current user")
 	}
@@ -37,12 +37,12 @@ func (c *Controller) SendFriendRequest(ctx context.Context, friendCode string) e
 		return fmt.Errorf("network client is not configured")
 	}
 
-	trimmedFriendCode := strings.ToUpper(strings.TrimSpace(friendCode))
-	if trimmedFriendCode == "" {
-		return fmt.Errorf("friend code is required")
+	trimmedContactCode := strings.ToUpper(strings.TrimSpace(contactCode))
+	if trimmedContactCode == "" {
+		return fmt.Errorf("contact code is required")
 	}
-	if trimmedFriendCode == c.State.CurrentUser.FriendCode {
-		return fmt.Errorf("cannot send a friend request to yourself")
+	if trimmedContactCode == c.State.CurrentUser.ContactCode {
+		return fmt.Errorf("cannot send a contact request to yourself")
 	}
 
 	if !c.State.ServerConnected {
@@ -51,13 +51,13 @@ func (c *Controller) SendFriendRequest(ctx context.Context, friendCode string) e
 		}
 	}
 
-	return c.Net.SendFriendRequest(uuid.NewString(), protocol.FriendRequestSendPayload{
-		FriendCode:  trimmedFriendCode,
-		FromProfile: c.currentPublicFriendProfile(),
+	return c.Net.SendContactRequest(uuid.NewString(), protocol.ContactRequestSendPayload{
+		ContactCode: trimmedContactCode,
+		FromProfile: c.currentPublicContactProfile(),
 	})
 }
 
-func (c *Controller) AcceptFriendRequest(ctx context.Context, fromUserID string) error {
+func (c *Controller) AcceptContactRequest(ctx context.Context, fromUserID string) error {
 	if c == nil || c.Net == nil {
 		return fmt.Errorf("network client is not configured")
 	}
@@ -71,13 +71,13 @@ func (c *Controller) AcceptFriendRequest(ctx context.Context, fromUserID string)
 		}
 	}
 
-	return c.Net.AcceptFriendRequest(uuid.NewString(), protocol.FriendRequestAcceptPayload{
+	return c.Net.AcceptContactRequest(uuid.NewString(), protocol.ContactRequestAcceptPayload{
 		FromUserID:    fromUserID,
-		AcceptProfile: c.currentPublicFriendProfile(),
+		AcceptProfile: c.currentPublicContactProfile(),
 	})
 }
 
-func (c *Controller) RejectFriendRequest(ctx context.Context, fromUserID string) error {
+func (c *Controller) RejectContactRequest(ctx context.Context, fromUserID string) error {
 	if c == nil || c.Net == nil {
 		return fmt.Errorf("network client is not configured")
 	}
@@ -91,20 +91,20 @@ func (c *Controller) RejectFriendRequest(ctx context.Context, fromUserID string)
 		}
 	}
 
-	return c.Net.RejectFriendRequest(uuid.NewString(), protocol.FriendRequestRejectPayload{
+	return c.Net.RejectContactRequest(uuid.NewString(), protocol.ContactRequestRejectPayload{
 		FromUserID: fromUserID,
 	})
 }
 
-func (c *Controller) currentPublicFriendProfile() protocol.PublicFriendProfile {
+func (c *Controller) currentPublicContactProfile() protocol.PublicContactProfile {
 	if c == nil || c.State == nil || c.State.CurrentUser == nil {
-		return protocol.PublicFriendProfile{}
+		return protocol.PublicContactProfile{}
 	}
 
-	return protocol.PublicFriendProfile{
-		UserID:     c.State.CurrentUser.ID,
-		FriendCode: c.State.CurrentUser.FriendCode,
-		Name:       c.State.CurrentUser.Name,
-		Username:   c.State.CurrentUser.Username,
+	return protocol.PublicContactProfile{
+		UserID:      c.State.CurrentUser.ID,
+		ContactCode: c.State.CurrentUser.ContactCode,
+		Name:        c.State.CurrentUser.Name,
+		Username:    c.State.CurrentUser.Username,
 	}
 }

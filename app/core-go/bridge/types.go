@@ -25,14 +25,14 @@ type Event struct {
 }
 
 type Snapshot struct {
-	CurrentUser          *User           `json:"current_user,omitempty"`
-	Messages             []Message       `json:"messages"`
-	Conversations        []Conversation  `json:"conversations"`
-	Friends              []Friend        `json:"friends"`
-	FriendRequests       []FriendRequest `json:"friend_requests"`
-	LoadedConversationID string          `json:"loaded_conversation_id"`
-	ServerConnected      bool            `json:"server_connected"`
-	LastNetworkError     string          `json:"last_network_error"`
+	CurrentUser          *User            `json:"current_user,omitempty"`
+	Messages             []Message        `json:"messages"`
+	Conversations        []Conversation   `json:"conversations"`
+	Contacts             []Contact        `json:"contacts"`
+	ContactRequests      []ContactRequest `json:"contact_requests"`
+	LoadedConversationID string           `json:"loaded_conversation_id"`
+	ServerConnected      bool             `json:"server_connected"`
+	LastNetworkError     string           `json:"last_network_error"`
 }
 
 type User struct {
@@ -40,7 +40,7 @@ type User struct {
 	Name              string `json:"name"`
 	Username          string `json:"username"`
 	ProfilePictureUrl string `json:"profile_picture_url"`
-	FriendCode        string `json:"friend_code"`
+	ContactCode       string `json:"contact_code"`
 }
 
 type Conversation struct {
@@ -58,21 +58,21 @@ type Message struct {
 	DeliveryState   string `json:"delivery_state"`
 }
 
-type Friend struct {
+type Contact struct {
 	ID                int64  `json:"id"`
 	UserID            string `json:"user_id"`
 	Name              string `json:"name"`
 	Username          string `json:"username"`
 	ProfilePictureUrl string `json:"profile_picture_url"`
-	FriendCode        string `json:"friend_code"`
+	ContactCode       string `json:"contact_code"`
 	CreatedAt         int64  `json:"created_at"`
 }
 
-type FriendRequest struct {
-	ID             int64  `json:"id"`
-	FromUserID     string `json:"from_user_id"`
-	Name           string `json:"name"`
-	Username       string `json:"username"`
-	FromFriendCode string `json:"from_friend_code"`
-	CreatedAt      int64  `json:"created_at"`
+type ContactRequest struct {
+	ID              int64  `json:"id"`
+	FromUserID      string `json:"from_user_id"`
+	Name            string `json:"name"`
+	Username        string `json:"username"`
+	FromContactCode string `json:"from_contact_code"`
+	CreatedAt       int64  `json:"created_at"`
 }

@@ -26,6 +26,7 @@ class AppController extends ChangeNotifier {
   String _activeConversationId = '';
   String _activeConversationName = 'Choose a conversation';
   bool _sidebarOpen = false;
+  bool _mobileNavOpen = false;
   bool _bootstrapping = false;
   bool _authInFlight = false;
   bool _initialized = false;
@@ -39,6 +40,7 @@ class AppController extends ChangeNotifier {
   String get activeConversationId => _activeConversationId;
   String get activeConversationName => _activeConversationName;
   bool get sidebarOpen => _sidebarOpen;
+  bool get mobileNavOpen => _mobileNavOpen;
   bool get isBootstrapping => _bootstrapping;
   bool get isAuthInFlight => _authInFlight;
   bool get isInitialized => _initialized;
@@ -64,9 +66,9 @@ class AppController extends ChangeNotifier {
         .toList(growable: false);
   }
 
-  List<CoreFriend> get friends => _snapshot?.friends ?? const [];
-  List<CoreFriendRequest> get friendRequests =>
-      _snapshot?.friendRequests ?? const [];
+  List<CoreContact> get contacts => _snapshot?.contacts ?? const [];
+  List<CoreContactRequest> get contactRequests =>
+      _snapshot?.contactRequests ?? const [];
 
   Future<void> bootstrap() async {
     if (_bootstrapping || _initialized) {
@@ -76,6 +78,12 @@ class AppController extends ChangeNotifier {
     _bootstrapping = true;
     _errorMessage = '';
     _statusMessage = 'Initializing core-go...';
+    _debugLog(
+      'Bootstrapping core-go with '
+      'profile="${profileName.isEmpty ? '(default)' : profileName}", '
+      'dataDir="${dataDir ?? '(core-go default)'}", '
+      'serverUrl="$serverUrl"',
+    );
     notifyListeners();
 
     try {
@@ -87,6 +95,12 @@ class AppController extends ChangeNotifier {
       );
       _coreApi = coreApi;
       _config = coreApi.config();
+      _debugLog(
+        'core-go config loaded: '
+        'dataDir="${_config?.dataDir ?? ''}", '
+        'dbPath="${_config?.dbPath ?? ''}", '
+        'serverUrl="${_config?.serverUrl ?? ''}"',
+      );
       final loadedSession = coreApi.tryLoadSession();
       _applySnapshot(coreApi.snapshot());
       _initialized = true;
@@ -94,9 +108,16 @@ class AppController extends ChangeNotifier {
           ? 'Loaded existing local session'
           : 'core-go initialized';
       _page = loadedSession ? AppPage.chat : AppPage.landing;
+      _sidebarOpen = loadedSession;
+      _mobileNavOpen = false;
       _startEventPolling();
-    } catch (error) {
-      _errorMessage = error.toString();
+    } catch (error, stackTrace) {
+      _setErrorMessage(
+        error.toString(),
+        context: 'bootstrap',
+        stackTrace: stackTrace,
+        logStackTrace: true,
+      );
       _statusMessage = 'Failed to initialize core-go';
     } finally {
       _bootstrapping = false;
@@ -107,7 +128,10 @@ class AppController extends ChangeNotifier {
   Future<void> refreshSnapshot() async {
     final coreApi = _coreApi;
     if (coreApi == null || !_initialized) {
-      _errorMessage = 'core-go is not initialized';
+      _setErrorMessage(
+        'core-go is not initialized',
+        context: 'refreshSnapshot',
+      );
       notifyListeners();
       return;
     }
@@ -120,8 +144,12 @@ class AppController extends ChangeNotifier {
       _config = coreApi.config();
       _applySnapshot(coreApi.snapshot());
       _statusMessage = 'Snapshot refreshed';
-    } catch (error) {
-      _errorMessage = error.toString();
+    } catch (error, stackTrace) {
+      _setErrorMessage(
+        error.toString(),
+        context: 'refreshSnapshot',
+        stackTrace: stackTrace,
+      );
     }
 
     notifyListeners();
@@ -130,7 +158,10 @@ class AppController extends ChangeNotifier {
   Future<void> openConversation(String conversationId) async {
     final coreApi = _coreApi;
     if (coreApi == null || !_initialized) {
-      _errorMessage = 'core-go is not initialized';
+      _setErrorMessage(
+        'core-go is not initialized',
+        context: 'openConversation',
+      );
       notifyListeners();
       return;
     }
@@ -143,8 +174,13 @@ class AppController extends ChangeNotifier {
       await coreApi.openConversation(conversationId);
       _applySnapshot(coreApi.snapshot());
       _sidebarOpen = false;
-    } catch (error) {
-      _errorMessage = error.toString();
+      _mobileNavOpen = false;
+    } catch (error, stackTrace) {
+      _setErrorMessage(
+        error.toString(),
+        context: 'openConversation',
+        stackTrace: stackTrace,
+      );
     }
 
     notifyListeners();
@@ -156,7 +192,7 @@ class AppController extends ChangeNotifier {
   }) async {
     final coreApi = _coreApi;
     if (coreApi == null || !_initialized) {
-      _errorMessage = 'core-go is not initialized';
+      _setErrorMessage('core-go is not initialized', context: 'login');
       notifyListeners();
       return;
     }
@@ -172,8 +208,10 @@ class AppController extends ChangeNotifier {
       _applySnapshot(coreApi.snapshot());
       _statusMessage = 'Signed in';
       _page = AppPage.chat;
+      _sidebarOpen = true;
+      _mobileNavOpen = false;
     } catch (error) {
-      _errorMessage = error.toString();
+      _setErrorMessage(error.toString(), context: 'login');
     } finally {
       _authInFlight = false;
       notifyListeners();
@@ -188,7 +226,7 @@ class AppController extends ChangeNotifier {
   }) async {
     final coreApi = _coreApi;
     if (coreApi == null || !_initialized) {
-      _errorMessage = 'core-go is not initialized';
+      _setErrorMessage('core-go is not initialized', context: 'register');
       notifyListeners();
       return;
     }
@@ -209,8 +247,10 @@ class AppController extends ChangeNotifier {
       _applySnapshot(coreApi.snapshot());
       _statusMessage = 'Account created';
       _page = AppPage.chat;
+      _sidebarOpen = true;
+      _mobileNavOpen = false;
     } catch (error) {
-      _errorMessage = error.toString();
+      _setErrorMessage(error.toString(), context: 'register');
     } finally {
       _authInFlight = false;
       notifyListeners();
@@ -220,7 +260,7 @@ class AppController extends ChangeNotifier {
   Future<void> logout() async {
     final coreApi = _coreApi;
     if (coreApi == null || !_initialized) {
-      _errorMessage = 'core-go is not initialized';
+      _setErrorMessage('core-go is not initialized', context: 'logout');
       notifyListeners();
       return;
     }
@@ -236,10 +276,15 @@ class AppController extends ChangeNotifier {
       _activeConversationId = '';
       _activeConversationName = 'Choose a conversation';
       _sidebarOpen = false;
+      _mobileNavOpen = false;
       _statusMessage = 'Signed out';
       _page = AppPage.landing;
-    } catch (error) {
-      _errorMessage = error.toString();
+    } catch (error, stackTrace) {
+      _setErrorMessage(
+        error.toString(),
+        context: 'logout',
+        stackTrace: stackTrace,
+      );
     } finally {
       _authInFlight = false;
       notifyListeners();
@@ -249,7 +294,7 @@ class AppController extends ChangeNotifier {
   Future<bool> sendMessage(String body) async {
     final coreApi = _coreApi;
     if (coreApi == null || !_initialized) {
-      _errorMessage = 'core-go is not initialized';
+      _setErrorMessage('core-go is not initialized', context: 'sendMessage');
       notifyListeners();
       return false;
     }
@@ -266,7 +311,7 @@ class AppController extends ChangeNotifier {
       _applySnapshot(coreApi.snapshot());
       return true;
     } catch (error) {
-      _errorMessage = error.toString();
+      _setErrorMessage(error.toString(), context: 'sendMessage');
       notifyListeners();
       return false;
     } finally {
@@ -274,10 +319,13 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  Future<void> startDirectConversation(String friendUserId) async {
+  Future<void> startDirectConversation(String contactUserId) async {
     final coreApi = _coreApi;
     if (coreApi == null || !_initialized) {
-      _errorMessage = 'core-go is not initialized';
+      _setErrorMessage(
+        'core-go is not initialized',
+        context: 'startDirectConversation',
+      );
       notifyListeners();
       return;
     }
@@ -288,14 +336,14 @@ class AppController extends ChangeNotifier {
 
     try {
       final conversationId = await coreApi.startDirectConversation(
-        friendUserId,
+        contactUserId,
       );
       _applySnapshot(coreApi.snapshot());
       _page = AppPage.chat;
       await openConversation(conversationId);
       return;
     } catch (error) {
-      _errorMessage = error.toString();
+      _setErrorMessage(error.toString(), context: 'startDirectConversation');
     }
 
     notifyListeners();
@@ -307,7 +355,10 @@ class AppController extends ChangeNotifier {
   }) async {
     final coreApi = _coreApi;
     if (coreApi == null || !_initialized) {
-      _errorMessage = 'core-go is not initialized';
+      _setErrorMessage(
+        'core-go is not initialized',
+        context: 'createConversation',
+      );
       notifyListeners();
       return;
     }
@@ -326,16 +377,19 @@ class AppController extends ChangeNotifier {
       await openConversation(conversationId);
       _infoMessage = 'Conversation created';
     } catch (error) {
-      _errorMessage = error.toString();
+      _setErrorMessage(error.toString(), context: 'createConversation');
     }
 
     notifyListeners();
   }
 
-  Future<void> sendFriendRequest(String friendCode) async {
+  Future<void> sendContactRequest(String contactCode) async {
     final coreApi = _coreApi;
     if (coreApi == null || !_initialized) {
-      _errorMessage = 'core-go is not initialized';
+      _setErrorMessage(
+        'core-go is not initialized',
+        context: 'sendContactRequest',
+      );
       notifyListeners();
       return;
     }
@@ -345,19 +399,22 @@ class AppController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await coreApi.sendFriendRequest(friendCode);
-      _infoMessage = 'Friend request sent';
+      await coreApi.sendContactRequest(contactCode);
+      _infoMessage = 'Contact request sent';
     } catch (error) {
-      _errorMessage = error.toString();
+      _setErrorMessage(error.toString(), context: 'sendContactRequest');
     }
 
     notifyListeners();
   }
 
-  Future<void> acceptFriendRequest(String fromUserId) async {
+  Future<void> acceptContactRequest(String fromUserId) async {
     final coreApi = _coreApi;
     if (coreApi == null || !_initialized) {
-      _errorMessage = 'core-go is not initialized';
+      _setErrorMessage(
+        'core-go is not initialized',
+        context: 'acceptContactRequest',
+      );
       notifyListeners();
       return;
     }
@@ -367,19 +424,22 @@ class AppController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await coreApi.acceptFriendRequest(fromUserId);
-      _infoMessage = 'Friend request accepted';
+      await coreApi.acceptContactRequest(fromUserId);
+      _infoMessage = 'Contact request accepted';
     } catch (error) {
-      _errorMessage = error.toString();
+      _setErrorMessage(error.toString(), context: 'acceptContactRequest');
     }
 
     notifyListeners();
   }
 
-  Future<void> rejectFriendRequest(String fromUserId) async {
+  Future<void> rejectContactRequest(String fromUserId) async {
     final coreApi = _coreApi;
     if (coreApi == null || !_initialized) {
-      _errorMessage = 'core-go is not initialized';
+      _setErrorMessage(
+        'core-go is not initialized',
+        context: 'rejectContactRequest',
+      );
       notifyListeners();
       return;
     }
@@ -389,10 +449,10 @@ class AppController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await coreApi.rejectFriendRequest(fromUserId);
-      _infoMessage = 'Friend request rejected';
+      await coreApi.rejectContactRequest(fromUserId);
+      _infoMessage = 'Contact request rejected';
     } catch (error) {
-      _errorMessage = error.toString();
+      _setErrorMessage(error.toString(), context: 'rejectContactRequest');
     }
 
     notifyListeners();
@@ -419,6 +479,8 @@ class AppController extends ChangeNotifier {
 
   void navigateTo(AppPage page) {
     _page = page;
+    _mobileNavOpen = false;
+    _sidebarOpen = page == AppPage.chat;
     _infoMessage = '';
     notifyListeners();
   }
@@ -427,11 +489,40 @@ class AppController extends ChangeNotifier {
     _activeConversationId = conversationId;
     _activeConversationName = conversationName;
     _sidebarOpen = false;
+    _mobileNavOpen = false;
     notifyListeners();
   }
 
   void toggleSidebar() {
     _sidebarOpen = !_sidebarOpen;
+    notifyListeners();
+  }
+
+  void showConversationList() {
+    _page = AppPage.chat;
+    _sidebarOpen = true;
+    _mobileNavOpen = false;
+    notifyListeners();
+  }
+
+  void openMobileNav() {
+    if (_mobileNavOpen) {
+      return;
+    }
+    _mobileNavOpen = true;
+    notifyListeners();
+  }
+
+  void toggleMobileNav() {
+    _mobileNavOpen = !_mobileNavOpen;
+    notifyListeners();
+  }
+
+  void closeMobileNav() {
+    if (!_mobileNavOpen) {
+      return;
+    }
+    _mobileNavOpen = false;
     notifyListeners();
   }
 
@@ -454,7 +545,13 @@ class AppController extends ChangeNotifier {
   }
 
   void _applySnapshot(CoreSnapshot snapshot) {
+    final previousNetworkError = _snapshot?.lastNetworkError ?? '';
     _snapshot = snapshot;
+
+    if (snapshot.lastNetworkError.isNotEmpty &&
+        snapshot.lastNetworkError != previousNetworkError) {
+      _debugLog('Network error from core-go: ${snapshot.lastNetworkError}');
+    }
 
     if (_activeConversationId.isNotEmpty &&
         !snapshot.conversations.any(
@@ -510,8 +607,13 @@ class AppController extends ChangeNotifier {
           changed = true;
         }
       }
-    } catch (error) {
-      _errorMessage = error.toString();
+    } catch (error, stackTrace) {
+      _setErrorMessage(
+        error.toString(),
+        context: 'pollEvents',
+        stackTrace: stackTrace,
+        logStackTrace: true,
+      );
       changed = true;
     } finally {
       _pollInFlight = false;
@@ -527,5 +629,28 @@ class AppController extends ChangeNotifier {
     _eventPollTimer?.cancel();
     _coreApi?.dispose();
     super.dispose();
+  }
+
+  void _setErrorMessage(
+    String message, {
+    required String context,
+    StackTrace? stackTrace,
+    bool logStackTrace = false,
+  }) {
+    _errorMessage = message;
+    if (message.isEmpty) {
+      return;
+    }
+    _debugLog('[$context] ERROR: $message');
+    if (logStackTrace && stackTrace != null && kDebugMode) {
+      debugPrintStack(stackTrace: stackTrace, label: '[albz][$context]');
+    }
+  }
+
+  void _debugLog(String message) {
+    if (!kDebugMode) {
+      return;
+    }
+    debugPrint('[albz] $message');
   }
 }

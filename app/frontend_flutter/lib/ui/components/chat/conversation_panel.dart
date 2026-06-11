@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/app_scope.dart';
 import '../../../core/core_api.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/responsive.dart';
 import '../base/app_panel.dart';
 
 class ConversationPanel extends StatelessWidget {
@@ -12,6 +13,8 @@ class ConversationPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = AppScope.of(context);
     final messages = controller.messages;
+    final width = MediaQuery.sizeOf(context).width;
+    final mobile = AppBreakpoints.isMobile(width);
 
     return AppPanel(
       color: Colors.transparent,
@@ -27,7 +30,10 @@ class ConversationPanel extends StatelessWidget {
               ),
             )
           : ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: EdgeInsets.symmetric(
+                horizontal: mobile ? 12 : 0,
+                vertical: 4,
+              ),
               itemCount: messages.length,
               separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
@@ -49,10 +55,14 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final mobile = AppBreakpoints.isMobile(width);
+    final maxBubbleWidth = mobile ? width - 48 : 520.0;
+
     return Align(
       alignment: alignEnd ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
+        constraints: BoxConstraints(maxWidth: maxBubbleWidth),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: alignEnd ? AppColors.accent : AppColors.card,
