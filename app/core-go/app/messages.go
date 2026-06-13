@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	dsql "database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -12,7 +13,9 @@ import (
 )
 
 const (
-	MessageDeliveryStatePending = "pending"
+	MessageDirectionIncoming    = "incoming"
+	MessageDirectionOutgoing    = "outgoing"
+	MessageDeliveryStateSending = "sending"
 	MessageDeliveryStateFailed  = "failed"
 )
 
@@ -54,15 +57,20 @@ func (c *Controller) AddMessage(ctx context.Context, conversationID string, body
 	}
 
 	clientMessageID := uuid.NewString()
+	messageID := uuid.NewString()
 	now := time.Now().Unix()
 
 	err = c.Store.Q.CreateMessage(ctx, sql.CreateMessageParams{
+		ID:              messageID,
 		ConversationID:  conversationID,
-		SenderID:        c.State.CurrentUser.ID,
+		SenderUserID:    c.State.CurrentUser.UserID,
+		SenderDeviceID:  nullString(c.State.CurrentUser.DeviceID),
 		ClientMessageID: clientMessageID,
 		Body:            trimmedBody,
 		CreatedAt:       now,
-		DeliveryState:   MessageDeliveryStatePending,
+		ReceivedAt:      dsql.NullInt64{},
+		Direction:       MessageDirectionOutgoing,
+		DeliveryState:   MessageDeliveryStateSending,
 	})
 	if err != nil {
 		return err
@@ -114,7 +122,7 @@ func (c *Controller) resolveConversationRecipients(ctx context.Context, conversa
 
 	recipientIDs := make([]string, 0, len(participantIDs))
 	for _, participantID := range participantIDs {
-		if participantID == c.State.CurrentUser.ID {
+		if participantID == c.State.CurrentUser.UserID {
 			continue
 		}
 

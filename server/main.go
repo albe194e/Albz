@@ -1,22 +1,31 @@
 package main
 
 import (
+	"context"
+	"crypto/ecdh"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	dbsqlc "github.com/albe194e/albz/server/db"
+	dbstorage "github.com/albe194e/albz/server/db/storage"
 	"github.com/albe194e/albz/shared/protocol"
 	"github.com/gorilla/websocket"
 )
 
-const defaultAddr = ":8080"
+const (
+	defaultAddr       = ":8080"
+	defaultDBPath     = "dev-local-db/server/relay.db"
+	authProofContext  = "haddle-relay-auth-v1"
+	authChallengeSize = 32
+)
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -25,16 +34,26 @@ var upgrader = websocket.Upgrader{
 }
 
 type relayServer struct {
+	store                *dbstorage.Store
 	mu                   sync.RWMutex
 	clientsByUserID      map[string]*clientConn
 	clientsByContactCode map[string]*clientConn
 }
 
+type pendingAuth struct {
+	ServerPrivateKey *ecdh.PrivateKey
+	Nonce            []byte
+}
+
 type clientConn struct {
-	userID      string
-	contactCode string
-	conn        *websocket.Conn
-	writeM      sync.Mutex
+	userID          string
+	deviceID        string
+	contactCode     string
+	devicePublicKey []byte
+	authenticated   bool
+	pendingAuth     *pendingAuth
+	conn            *websocket.Conn
+	writeM          sync.Mutex
 }
 
 type rawEnvelope struct {
@@ -44,12 +63,21 @@ type rawEnvelope struct {
 }
 
 func main() {
-	addr := os.Getenv("ALBZ_SERVER_ADDR")
+	addr := os.Getenv("HADDLE_SERVER_ADDR")
 	if addr == "" {
 		addr = defaultAddr
 	}
 
+	store, err := dbstorage.OpenSQLite(context.Background(), resolveServerDBPath(), dbsqlc.SchemaSQL)
+	if err != nil {
+		logFatalf("open relay db: %v", err)
+	}
+	defer func() {
+		_ = store.Close()
+	}()
+
 	server := &relayServer{
+		store:                store,
 		clientsByUserID:      make(map[string]*clientConn),
 		clientsByContactCode: make(map[string]*clientConn),
 	}
@@ -58,8 +86,18 @@ func main() {
 	mux.HandleFunc("/health", handleHealth)
 	mux.HandleFunc("/ws", server.handleWebSocket)
 
-	log.Printf("relay server listening on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, mux))
+	logInfof("relay server listening on %s", addr)
+	if err := http.ListenAndServe(addr, mux); err != nil {
+		logFatalf("relay server stopped: %v", err)
+	}
+}
+
+func resolveServerDBPath() string {
+	if configured := strings.TrimSpace(os.Getenv("HADDLE_SERVER_DB_PATH")); configured != "" {
+		return configured
+	}
+
+	return filepath.Clean(defaultDBPath)
 }
 
 func handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -68,30 +106,13 @@ func handleHealth(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *relayServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	userID := strings.TrimSpace(r.URL.Query().Get("user_id"))
-	contactCode := strings.TrimSpace(r.URL.Query().Get("contact_code"))
-	if userID == "" {
-		http.Error(w, "missing user_id", http.StatusBadRequest)
-		return
-	}
-	if contactCode == "" {
-		http.Error(w, "missing contact_code", http.StatusBadRequest)
-		return
-	}
-
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
 
 	client := &clientConn{
-		userID:      userID,
-		contactCode: contactCode,
-		conn:        conn,
-	}
-
-	for _, previous := range s.registerClient(client) {
-		_ = previous.close()
+		conn: conn,
 	}
 
 	defer func() {
@@ -102,14 +123,19 @@ func (s *relayServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	for {
 		if err := s.readAndHandleMessage(client); err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("unexpected websocket close for %s: %v", client.userID, err)
+				logDebugf(
+					"unexpected websocket close for user=%s device=%s: %v",
+					redactID(client.userID),
+					redactID(client.deviceID),
+					err,
+				)
 			}
 			return
 		}
 	}
 }
 
-func (s *relayServer) registerClient(client *clientConn) []*clientConn {
+func (s *relayServer) registerAuthenticatedClient(client *clientConn) []*clientConn {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -156,6 +182,17 @@ func (s *relayServer) readAndHandleMessage(client *clientConn) error {
 	var envelope rawEnvelope
 	if err := json.Unmarshal(data, &envelope); err != nil {
 		return s.sendError(client, "", protocol.ErrorCodeInvalidMessage, "message must be valid JSON")
+	}
+
+	if !client.authenticated {
+		switch envelope.Type {
+		case protocol.EventDeviceRegister:
+			return s.handleDeviceRegister(client, envelope)
+		case protocol.EventAuthRespond:
+			return s.handleAuthRespond(client, envelope)
+		default:
+			return s.sendError(client, envelope.RequestID, protocol.ErrorCodeUnauthenticated, "client must authenticate before sending relay events")
+		}
 	}
 
 	switch envelope.Type {
@@ -211,6 +248,18 @@ func (s *relayServer) sendError(client *clientConn, requestID, code, message str
 		RequestID: requestID,
 		Timestamp: time.Now().Unix(),
 		Payload: protocol.ErrorPayload{
+			Code:    code,
+			Message: message,
+		},
+	})
+}
+
+func (s *relayServer) sendAuthFailure(client *clientConn, code, message string) error {
+	return client.writeJSON(protocol.Envelope[protocol.AuthFailurePayload]{
+		Type:      protocol.EventAuthFailure,
+		EventID:   newID(),
+		Timestamp: time.Now().Unix(),
+		Payload: protocol.AuthFailurePayload{
 			Code:    code,
 			Message: message,
 		},

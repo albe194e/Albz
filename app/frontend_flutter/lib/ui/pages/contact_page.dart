@@ -1,12 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../app/app_controller.dart';
 import '../../app/app_scope.dart';
 import '../../core/core_api.dart';
 import '../components/base/app_button.dart';
-import '../components/base/app_input.dart';
 import '../components/base/contact_card.dart';
-import '../components/base/mobile_page_header.dart';
 import '../components/base/section.dart';
+import '../components/base/mobile_page_header.dart';
+import '../components/contacts/contact_qr_dialog.dart';
 import '../theme/app_theme.dart';
 
 enum _ContactTab { contacts, requests }
@@ -21,8 +24,10 @@ class ContactPage extends StatefulWidget {
 class _ContactPageState extends State<ContactPage> {
   _ContactTab _selectedTab = _ContactTab.contacts;
   final TextEditingController _contactCodeController = TextEditingController(
-    text: 'ALBZ-',
+    text: 'HADDLE-',
   );
+  bool _addContactDialogOpen = false;
+  bool _pendingDialogScheduled = false;
 
   @override
   void dispose() {
@@ -35,6 +40,7 @@ class _ContactPageState extends State<ContactPage> {
     final controller = AppScope.of(context);
     final width = MediaQuery.sizeOf(context).width;
     final mobile = width < 760;
+    _schedulePendingContactDialogIfNeeded(controller);
 
     return Padding(
       padding: EdgeInsets.all(mobile ? 16 : 24),
@@ -77,84 +83,47 @@ class _ContactPageState extends State<ContactPage> {
   }
 
   Future<void> _showAddContactDialog(BuildContext context) async {
-    final controller = AppScope.of(context);
-    final currentUser = controller.currentUser;
+    if (_addContactDialogOpen) {
+      return;
+    }
 
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: AppColors.card,
-          insetPadding: const EdgeInsets.all(24),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Add Contact',
-                    style: Theme.of(dialogContext).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    currentUser?.contactCode.isNotEmpty == true
-                        ? currentUser!.contactCode
-                        : 'Contact code unavailable',
-                    style: Theme.of(dialogContext).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  AppInput(
-                    label: 'Contact code',
-                    hint: 'Enter a contact code',
-                    controller: _contactCodeController,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: AppButton.secondary(
-                          label: 'Scan QR',
-                          onPressed: () {
-                            controller.showInfo(
-                              'QR scan is not implemented yet.',
-                            );
-                            Navigator.of(dialogContext).pop();
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: AppButton.primary(
-                          label: 'Send',
-                          onPressed: () async {
-                            await controller.sendContactRequest(
-                              _contactCodeController.text,
-                            );
-                            if (!dialogContext.mounted) {
-                              return;
-                            }
-                            if (controller.errorMessage.isEmpty) {
-                              _contactCodeController.text = 'ALBZ-';
-                              Navigator.of(dialogContext).pop();
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
+    _addContactDialogOpen = true;
+    final controller = AppScope.of(context);
+    unawaited(controller.loadContactQrCode());
+
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (_) =>
+            ContactQrDialog(contactCodeController: _contactCodeController),
+      );
+    } finally {
+      _addContactDialogOpen = false;
+    }
+  }
+
+  void _schedulePendingContactDialogIfNeeded(AppController controller) {
+    if (_pendingDialogScheduled ||
+        _addContactDialogOpen ||
+        controller.pendingContactCode.isEmpty) {
+      return;
+    }
+
+    _pendingDialogScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _pendingDialogScheduled = false;
+      if (!mounted || _addContactDialogOpen) {
+        return;
+      }
+
+      final pendingContactCode = controller.takePendingContactCode();
+      if (pendingContactCode.isEmpty) {
+        return;
+      }
+
+      _contactCodeController.text = pendingContactCode;
+      await _showAddContactDialog(context);
+    });
   }
 }
 

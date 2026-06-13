@@ -133,7 +133,7 @@ func resolveConfig(options Options) (Config, error) {
 			return Config{}, fmt.Errorf("resolve data dir: %w", err)
 		}
 		config.DataDir = absoluteDataDir
-		config.DBPath = filepath.Join(absoluteDataDir, "albz.db")
+		config.DBPath = filepath.Join(absoluteDataDir, "haddle.db")
 		return config, nil
 	}
 
@@ -143,7 +143,7 @@ func resolveConfig(options Options) (Config, error) {
 
 	if profileName == "" {
 		config.DataDir = filepath.Join("dev-local-db", "local_storage")
-		config.DBPath = filepath.Join(config.DataDir, "albz.db")
+		config.DBPath = filepath.Join(config.DataDir, "haddle.db")
 		return config, nil
 	}
 
@@ -154,7 +154,7 @@ func resolveConfig(options Options) (Config, error) {
 
 	config.ProfileName = normalizedProfile
 	config.DataDir = filepath.Join("dev-local-db", "local_storage", "profiles", normalizedProfile)
-	config.DBPath = filepath.Join(config.DataDir, "albz.db")
+	config.DBPath = filepath.Join(config.DataDir, "haddle.db")
 	return config, nil
 }
 
@@ -181,7 +181,7 @@ func normalizeProfileName(value string) (string, error) {
 
 func defaultServerURL(value string) string {
 	if value == "" {
-		value = strings.TrimSpace(os.Getenv("ALBZ_SERVER_WS_URL"))
+		value = strings.TrimSpace(os.Getenv("HADDLE_SERVER_WS_URL"))
 	}
 	if value == "" {
 		return "ws://localhost:8080/ws"

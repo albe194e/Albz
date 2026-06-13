@@ -64,7 +64,7 @@ function Resolve-GppExecutable {
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $outputDir = Join-Path $repoRoot "app\frontend_flutter\native\windows"
-$outputDLL = Join-Path $outputDir "albz_core.dll"
+$outputDLL = Join-Path $outputDir "haddle_core.dll"
 
 $goExe = Resolve-GoExecutable
 $gccExe = Resolve-GccExecutable

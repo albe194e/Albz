@@ -7,41 +7,8 @@ package sql
 
 import (
 	"context"
+	"database/sql"
 )
-
-const createUser = `-- name: CreateUser :exec
-INSERT INTO users (
-	id,
-	name,
-	username,
-	hashed_password,
-	profile_picture_url,
-	contact_code
-) VALUES (
-	?, ?, ?, ?, ?, ?
-)
-`
-
-type CreateUserParams struct {
-	ID                string `db:"id" json:"id"`
-	Name              string `db:"name" json:"name"`
-	Username          string `db:"username" json:"username"`
-	HashedPassword    string `db:"hashed_password" json:"hashed_password"`
-	ProfilePictureUrl string `db:"profile_picture_url" json:"profile_picture_url"`
-	ContactCode       string `db:"contact_code" json:"contact_code"`
-}
-
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
-	_, err := q.db.ExecContext(ctx, createUser,
-		arg.ID,
-		arg.Name,
-		arg.Username,
-		arg.HashedPassword,
-		arg.ProfilePictureUrl,
-		arg.ContactCode,
-	)
-	return err
-}
 
 const deleteCurrentSession = `-- name: DeleteCurrentSession :exec
 DELETE FROM sessions
@@ -54,7 +21,7 @@ func (q *Queries) DeleteCurrentSession(ctx context.Context) error {
 }
 
 const getCurrentSession = `-- name: GetCurrentSession :one
-SELECT id, session_id, user_id, created_at, expires_at
+SELECT id, session_id, user_id, device_id, created_at, expires_at
 FROM sessions
 WHERE id = 1
 `
@@ -66,28 +33,35 @@ func (q *Queries) GetCurrentSession(ctx context.Context) (Session, error) {
 		&i.ID,
 		&i.SessionID,
 		&i.UserID,
+		&i.DeviceID,
 		&i.CreatedAt,
 		&i.ExpiresAt,
 	)
 	return i, err
 }
 
-const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, name, username, hashed_password, profile_picture_url, contact_code
-FROM users
-WHERE username = ?
+const getLocalIdentity = `-- name: GetLocalIdentity :one
+SELECT id, user_id, device_id, device_public_key, encrypted_device_private_key, kdf_salt, kdf_params, name, local_handle, profile_picture_path, contact_code, created_at
+FROM local_identity
+WHERE id = 1
 `
 
-func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByUsername, username)
-	var i User
+func (q *Queries) GetLocalIdentity(ctx context.Context) (LocalIdentity, error) {
+	row := q.db.QueryRowContext(ctx, getLocalIdentity)
+	var i LocalIdentity
 	err := row.Scan(
 		&i.ID,
+		&i.UserID,
+		&i.DeviceID,
+		&i.DevicePublicKey,
+		&i.EncryptedDevicePrivateKey,
+		&i.KdfSalt,
+		&i.KdfParams,
 		&i.Name,
-		&i.Username,
-		&i.HashedPassword,
-		&i.ProfilePictureUrl,
+		&i.LocalHandle,
+		&i.ProfilePicturePath,
 		&i.ContactCode,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -97,14 +71,16 @@ INSERT INTO sessions (
 	id,
 	session_id,
 	user_id,
+	device_id,
 	created_at,
 	expires_at
 ) VALUES (
-	1, ?, ?, ?, ?
+	1, ?, ?, ?, ?, ?
 )
 ON CONFLICT(id) DO UPDATE SET
 	session_id = excluded.session_id,
 	user_id = excluded.user_id,
+	device_id = excluded.device_id,
 	created_at = excluded.created_at,
 	expires_at = excluded.expires_at
 `
@@ -112,6 +88,7 @@ ON CONFLICT(id) DO UPDATE SET
 type UpsertCurrentSessionParams struct {
 	SessionID string `db:"session_id" json:"session_id"`
 	UserID    string `db:"user_id" json:"user_id"`
+	DeviceID  string `db:"device_id" json:"device_id"`
 	CreatedAt int64  `db:"created_at" json:"created_at"`
 	ExpiresAt int64  `db:"expires_at" json:"expires_at"`
 }
@@ -120,8 +97,71 @@ func (q *Queries) UpsertCurrentSession(ctx context.Context, arg UpsertCurrentSes
 	_, err := q.db.ExecContext(ctx, upsertCurrentSession,
 		arg.SessionID,
 		arg.UserID,
+		arg.DeviceID,
 		arg.CreatedAt,
 		arg.ExpiresAt,
+	)
+	return err
+}
+
+const upsertLocalIdentity = `-- name: UpsertLocalIdentity :exec
+INSERT INTO local_identity (
+	id,
+	user_id,
+	device_id,
+	device_public_key,
+	encrypted_device_private_key,
+	kdf_salt,
+	kdf_params,
+	name,
+	local_handle,
+	profile_picture_path,
+	contact_code,
+	created_at
+) VALUES (
+	1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+)
+ON CONFLICT(id) DO UPDATE SET
+	user_id = excluded.user_id,
+	device_id = excluded.device_id,
+	device_public_key = excluded.device_public_key,
+	encrypted_device_private_key = excluded.encrypted_device_private_key,
+	kdf_salt = excluded.kdf_salt,
+	kdf_params = excluded.kdf_params,
+	name = excluded.name,
+	local_handle = excluded.local_handle,
+	profile_picture_path = excluded.profile_picture_path,
+	contact_code = excluded.contact_code,
+	created_at = excluded.created_at
+`
+
+type UpsertLocalIdentityParams struct {
+	UserID                    string         `db:"user_id" json:"user_id"`
+	DeviceID                  string         `db:"device_id" json:"device_id"`
+	DevicePublicKey           []byte         `db:"device_public_key" json:"device_public_key"`
+	EncryptedDevicePrivateKey []byte         `db:"encrypted_device_private_key" json:"encrypted_device_private_key"`
+	KdfSalt                   []byte         `db:"kdf_salt" json:"kdf_salt"`
+	KdfParams                 string         `db:"kdf_params" json:"kdf_params"`
+	Name                      string         `db:"name" json:"name"`
+	LocalHandle               sql.NullString `db:"local_handle" json:"local_handle"`
+	ProfilePicturePath        sql.NullString `db:"profile_picture_path" json:"profile_picture_path"`
+	ContactCode               sql.NullString `db:"contact_code" json:"contact_code"`
+	CreatedAt                 int64          `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) UpsertLocalIdentity(ctx context.Context, arg UpsertLocalIdentityParams) error {
+	_, err := q.db.ExecContext(ctx, upsertLocalIdentity,
+		arg.UserID,
+		arg.DeviceID,
+		arg.DevicePublicKey,
+		arg.EncryptedDevicePrivateKey,
+		arg.KdfSalt,
+		arg.KdfParams,
+		arg.Name,
+		arg.LocalHandle,
+		arg.ProfilePicturePath,
+		arg.ContactCode,
+		arg.CreatedAt,
 	)
 	return err
 }

@@ -7,43 +7,60 @@ package sql
 
 import (
 	"context"
+	"database/sql"
 )
 
 const addParticipant = `-- name: AddParticipant :exec
-INSERT INTO conversation_participants (conversation_id, participant_id)
-VALUES (?, ?)
+INSERT INTO conversation_participants (conversation_id, user_id, created_at)
+VALUES (?, ?, ?)
 `
 
 type AddParticipantParams struct {
 	ConversationID string `db:"conversation_id" json:"conversation_id"`
-	ParticipantID  string `db:"participant_id" json:"participant_id"`
+	UserID         string `db:"user_id" json:"user_id"`
+	CreatedAt      int64  `db:"created_at" json:"created_at"`
 }
 
 func (q *Queries) AddParticipant(ctx context.Context, arg AddParticipantParams) error {
-	_, err := q.db.ExecContext(ctx, addParticipant, arg.ConversationID, arg.ParticipantID)
+	_, err := q.db.ExecContext(ctx, addParticipant, arg.ConversationID, arg.UserID, arg.CreatedAt)
 	return err
 }
 
 const createConversation = `-- name: CreateConversation :one
-INSERT INTO conversations (id, name)
-VALUES (?, ?)
-RETURNING id, name
+INSERT INTO conversations (id, name, type, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?)
+RETURNING id, name, type, created_at, updated_at
 `
 
 type CreateConversationParams struct {
-	ID   string `db:"id" json:"id"`
-	Name string `db:"name" json:"name"`
+	ID        string        `db:"id" json:"id"`
+	Name      string        `db:"name" json:"name"`
+	Type      string        `db:"type" json:"type"`
+	CreatedAt int64         `db:"created_at" json:"created_at"`
+	UpdatedAt sql.NullInt64 `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) CreateConversation(ctx context.Context, arg CreateConversationParams) (Conversation, error) {
-	row := q.db.QueryRowContext(ctx, createConversation, arg.ID, arg.Name)
+	row := q.db.QueryRowContext(ctx, createConversation,
+		arg.ID,
+		arg.Name,
+		arg.Type,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
 	var i Conversation
-	err := row.Scan(&i.ID, &i.Name)
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Type,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
 	return i, err
 }
 
 const getConversationByID = `-- name: GetConversationByID :one
-SELECT id, name
+SELECT id, name, type, created_at, updated_at
 FROM conversations
 WHERE id = ?
 `
@@ -51,20 +68,26 @@ WHERE id = ?
 func (q *Queries) GetConversationByID(ctx context.Context, id string) (Conversation, error) {
 	row := q.db.QueryRowContext(ctx, getConversationByID, id)
 	var i Conversation
-	err := row.Scan(&i.ID, &i.Name)
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Type,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
 	return i, err
 }
 
 const getConversationsByUserID = `-- name: GetConversationsByUserID :many
-SELECT conversations.id, conversations.name
+SELECT conversations.id, conversations.name, conversations.type, conversations.created_at, conversations.updated_at
 FROM conversations
 JOIN conversation_participants ON conversation_participants.conversation_id = conversations.id
-WHERE conversation_participants.participant_id = ?
-ORDER BY conversations.id DESC
+WHERE conversation_participants.user_id = ?
+ORDER BY COALESCE(conversations.updated_at, conversations.created_at) DESC, conversations.id DESC
 `
 
-func (q *Queries) GetConversationsByUserID(ctx context.Context, participantID string) ([]Conversation, error) {
-	rows, err := q.db.QueryContext(ctx, getConversationsByUserID, participantID)
+func (q *Queries) GetConversationsByUserID(ctx context.Context, userID string) ([]Conversation, error) {
+	rows, err := q.db.QueryContext(ctx, getConversationsByUserID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +95,13 @@ func (q *Queries) GetConversationsByUserID(ctx context.Context, participantID st
 	items := []Conversation{}
 	for rows.Next() {
 		var i Conversation
-		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Type,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -87,9 +116,10 @@ func (q *Queries) GetConversationsByUserID(ctx context.Context, participantID st
 }
 
 const listConversationParticipantIDs = `-- name: ListConversationParticipantIDs :many
-SELECT participant_id
+SELECT user_id
 FROM conversation_participants
 WHERE conversation_id = ?
+ORDER BY created_at ASC, id ASC
 `
 
 func (q *Queries) ListConversationParticipantIDs(ctx context.Context, conversationID string) ([]string, error) {
@@ -100,11 +130,11 @@ func (q *Queries) ListConversationParticipantIDs(ctx context.Context, conversati
 	defer rows.Close()
 	items := []string{}
 	for rows.Next() {
-		var participant_id string
-		if err := rows.Scan(&participant_id); err != nil {
+		var user_id string
+		if err := rows.Scan(&user_id); err != nil {
 			return nil, err
 		}
-		items = append(items, participant_id)
+		items = append(items, user_id)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

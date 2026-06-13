@@ -2,7 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../core/app_log.dart';
 import '../core/core_api.dart';
+import '../platform/deep_link_bridge.dart';
+import 'contact_deep_link.dart';
 import 'app_page.dart';
 
 class AppController extends ChangeNotifier {
@@ -11,6 +14,7 @@ class AppController extends ChangeNotifier {
     this.dataDir,
     this.serverUrl = 'ws://localhost:8080/ws',
   }) {
+    unawaited(_startDeepLinkHandling());
     bootstrap();
   }
 
@@ -33,8 +37,12 @@ class AppController extends ChangeNotifier {
   String _statusMessage = 'Initializing core-go...';
   String _errorMessage = '';
   String _infoMessage = '';
+  Uint8List? _contactQrCodeBytes;
+  bool _contactQrCodeLoading = false;
   Timer? _eventPollTimer;
   bool _pollInFlight = false;
+  StreamSubscription<Uri>? _deepLinkSubscription;
+  String _pendingContactCode = '';
 
   AppPage get page => _page;
   String get activeConversationId => _activeConversationId;
@@ -47,8 +55,11 @@ class AppController extends ChangeNotifier {
   String get statusMessage => _statusMessage;
   String get errorMessage => _errorMessage;
   String get infoMessage => _infoMessage;
+  Uint8List? get contactQrCodeBytes => _contactQrCodeBytes;
+  bool get isContactQrCodeLoading => _contactQrCodeLoading;
   CoreConfig? get config => _config;
   CoreSnapshot? get snapshot => _snapshot;
+  String get pendingContactCode => _pendingContactCode;
 
   CoreUser? get currentUser => _snapshot?.currentUser;
   List<CoreConversation> get conversations =>
@@ -103,13 +114,23 @@ class AppController extends ChangeNotifier {
       );
       final loadedSession = coreApi.tryLoadSession();
       _applySnapshot(coreApi.snapshot());
+      final restoredUser = _snapshot?.currentUser;
+      final hasRestoredUser =
+          restoredUser != null && restoredUser.id.isNotEmpty;
+      if (loadedSession && !hasRestoredUser) {
+        _debugLog(
+          'Discarding stale authenticated route because no valid current user was restored.',
+        );
+      }
+      final openedAuthenticatedSession = loadedSession && hasRestoredUser;
       _initialized = true;
-      _statusMessage = loadedSession
+      _statusMessage = openedAuthenticatedSession
           ? 'Loaded existing local session'
           : 'core-go initialized';
-      _page = loadedSession ? AppPage.chat : AppPage.landing;
-      _sidebarOpen = loadedSession;
+      _page = openedAuthenticatedSession ? AppPage.chat : AppPage.landing;
+      _sidebarOpen = openedAuthenticatedSession;
       _mobileNavOpen = false;
+      _applyPendingContactNavigation();
       _startEventPolling();
     } catch (error, stackTrace) {
       _setErrorMessage(
@@ -117,6 +138,7 @@ class AppController extends ChangeNotifier {
         context: 'bootstrap',
         stackTrace: stackTrace,
         logStackTrace: true,
+        logInNonDev: true,
       );
       _statusMessage = 'Failed to initialize core-go';
     } finally {
@@ -210,6 +232,7 @@ class AppController extends ChangeNotifier {
       _page = AppPage.chat;
       _sidebarOpen = true;
       _mobileNavOpen = false;
+      _applyPendingContactNavigation();
     } catch (error) {
       _setErrorMessage(error.toString(), context: 'login');
     } finally {
@@ -249,6 +272,7 @@ class AppController extends ChangeNotifier {
       _page = AppPage.chat;
       _sidebarOpen = true;
       _mobileNavOpen = false;
+      _applyPendingContactNavigation();
     } catch (error) {
       _setErrorMessage(error.toString(), context: 'register');
     } finally {
@@ -278,6 +302,8 @@ class AppController extends ChangeNotifier {
       _sidebarOpen = false;
       _mobileNavOpen = false;
       _statusMessage = 'Signed out';
+      _contactQrCodeBytes = null;
+      _contactQrCodeLoading = false;
       _page = AppPage.landing;
     } catch (error, stackTrace) {
       _setErrorMessage(
@@ -477,6 +503,50 @@ class AppController extends ChangeNotifier {
     return savedPath;
   }
 
+  Future<void> loadContactQrCode({bool forceRefresh = false}) async {
+    final coreApi = _coreApi;
+    if (coreApi == null || !_initialized) {
+      _setErrorMessage(
+        'core-go is not initialized',
+        context: 'loadContactQrCode',
+      );
+      notifyListeners();
+      return;
+    }
+    if (currentUser == null) {
+      _setErrorMessage(
+        'current user is not available',
+        context: 'loadContactQrCode',
+      );
+      notifyListeners();
+      return;
+    }
+    if (_contactQrCodeLoading) {
+      return;
+    }
+    if (!forceRefresh && _contactQrCodeBytes != null) {
+      return;
+    }
+
+    _contactQrCodeLoading = true;
+    _errorMessage = '';
+    notifyListeners();
+
+    try {
+      _contactQrCodeBytes = coreApi.getContactQrCodePng();
+    } catch (error, stackTrace) {
+      _contactQrCodeBytes = null;
+      _setErrorMessage(
+        error.toString(),
+        context: 'loadContactQrCode',
+        stackTrace: stackTrace,
+      );
+    } finally {
+      _contactQrCodeLoading = false;
+      notifyListeners();
+    }
+  }
+
   void navigateTo(AppPage page) {
     _page = page;
     _mobileNavOpen = false;
@@ -544,9 +614,21 @@ class AppController extends ChangeNotifier {
     showInfo('$action is the next wiring step for the Flutter migration.');
   }
 
+  String takePendingContactCode() {
+    final pending = _pendingContactCode;
+    _pendingContactCode = '';
+    return pending;
+  }
+
   void _applySnapshot(CoreSnapshot snapshot) {
+    final previousContactCode = _snapshot?.currentUser?.contactCode ?? '';
     final previousNetworkError = _snapshot?.lastNetworkError ?? '';
     _snapshot = snapshot;
+    final nextContactCode = snapshot.currentUser?.contactCode ?? '';
+    if (nextContactCode != previousContactCode) {
+      _contactQrCodeBytes = null;
+      _contactQrCodeLoading = false;
+    }
 
     if (snapshot.lastNetworkError.isNotEmpty &&
         snapshot.lastNetworkError != previousNetworkError) {
@@ -588,6 +670,50 @@ class AppController extends ChangeNotifier {
     });
   }
 
+  Future<void> _startDeepLinkHandling() async {
+    _deepLinkSubscription = DeepLinkBridge.uriStream.listen(_handleDeepLinkUri);
+
+    try {
+      final initialUri = await DeepLinkBridge.getInitialUri();
+      if (initialUri != null) {
+        _handleDeepLinkUri(initialUri);
+      }
+    } catch (error, stackTrace) {
+      AppLog.error(
+        context: 'deepLinkInit',
+        message: error.toString(),
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  void _handleDeepLinkUri(Uri uri) {
+    final contactCode = ContactDeepLink.parseContactCode(uri);
+    if (contactCode == null) {
+      _debugLog('Ignoring unsupported deep link: $uri');
+      return;
+    }
+
+    _pendingContactCode = contactCode;
+    if (currentUser == null) {
+      _infoMessage = 'Sign in to add contact $contactCode.';
+      _errorMessage = '';
+    }
+    _applyPendingContactNavigation();
+    notifyListeners();
+  }
+
+  void _applyPendingContactNavigation() {
+    if (_pendingContactCode.isEmpty || currentUser == null) {
+      return;
+    }
+
+    _page = AppPage.contacts;
+    _sidebarOpen = false;
+    _mobileNavOpen = false;
+    _infoMessage = 'Ready to add contact $_pendingContactCode.';
+  }
+
   Future<void> _pollEvents() async {
     final coreApi = _coreApi;
     if (_pollInFlight || coreApi == null || !_initialized) {
@@ -613,6 +739,7 @@ class AppController extends ChangeNotifier {
         context: 'pollEvents',
         stackTrace: stackTrace,
         logStackTrace: true,
+        logInNonDev: true,
       );
       changed = true;
     } finally {
@@ -627,6 +754,7 @@ class AppController extends ChangeNotifier {
   @override
   void dispose() {
     _eventPollTimer?.cancel();
+    _deepLinkSubscription?.cancel();
     _coreApi?.dispose();
     super.dispose();
   }
@@ -636,21 +764,22 @@ class AppController extends ChangeNotifier {
     required String context,
     StackTrace? stackTrace,
     bool logStackTrace = false,
+    bool logInNonDev = false,
   }) {
     _errorMessage = message;
     if (message.isEmpty) {
       return;
     }
-    _debugLog('[$context] ERROR: $message');
-    if (logStackTrace && stackTrace != null && kDebugMode) {
-      debugPrintStack(stackTrace: stackTrace, label: '[albz][$context]');
-    }
+    AppLog.error(
+      context: context,
+      message: message,
+      stackTrace: stackTrace,
+      logStackTrace: logStackTrace,
+      logInNonDev: logInNonDev,
+    );
   }
 
   void _debugLog(String message) {
-    if (!kDebugMode) {
-      return;
-    }
-    debugPrint('[albz] $message');
+    AppLog.debug(message);
   }
 }

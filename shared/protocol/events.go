@@ -3,6 +3,11 @@ package protocol
 type EventType string
 
 const (
+	EventDeviceRegister         EventType = "device.register"
+	EventAuthChallenge          EventType = "auth.challenge"
+	EventAuthRespond            EventType = "auth.respond"
+	EventAuthSuccess            EventType = "auth.success"
+	EventAuthFailure            EventType = "auth.failure"
 	EventMessageSend            EventType = "message.send"
 	EventMessageCreated         EventType = "message.created"
 	EventMessageDelivery        EventType = "message.delivery"
@@ -18,12 +23,16 @@ const (
 )
 
 const (
-	ErrorCodeInvalidMessage      = "invalid_message"
-	ErrorCodeUnsupported         = "unsupported_event"
-	ErrorCodeInternal            = "internal_error"
-	ErrorCodeRecipientOffline    = "recipient_offline"
-	ErrorCodeContactCodeNotFound = "contact_code_not_found"
-	ErrorCodeInvalidRecipient    = "invalid_recipient"
+	ErrorCodeInvalidMessage             = "invalid_message"
+	ErrorCodeUnsupported                = "unsupported_event"
+	ErrorCodeInternal                   = "internal_error"
+	ErrorCodeRecipientOffline           = "recipient_offline"
+	ErrorCodeContactCodeNotFound        = "contact_code_not_found"
+	ErrorCodeInvalidRecipient           = "invalid_recipient"
+	ErrorCodeUnauthenticated            = "unauthenticated"
+	ErrorCodeAuthFailed                 = "auth_failed"
+	ErrorCodeDeviceRegistrationConflict = "device_registration_conflict"
+	ErrorCodeDeviceNotRegistered        = "device_not_registered"
 )
 
 type Envelope[T any] struct {
@@ -32,6 +41,37 @@ type Envelope[T any] struct {
 	RequestID string    `json:"request_id,omitempty"`
 	Timestamp int64     `json:"timestamp,omitempty"`
 	Payload   T         `json:"payload"`
+}
+
+type DeviceRegisterPayload struct {
+	UserID          string `json:"user_id"`
+	DeviceID        string `json:"device_id"`
+	DevicePublicKey []byte `json:"device_public_key"`
+	ContactCode     string `json:"contact_code"`
+}
+
+type AuthChallengePayload struct {
+	UserID          string `json:"user_id"`
+	DeviceID        string `json:"device_id"`
+	ServerPublicKey []byte `json:"server_public_key"`
+	Nonce           []byte `json:"nonce"`
+}
+
+type AuthRespondPayload struct {
+	UserID   string `json:"user_id"`
+	DeviceID string `json:"device_id"`
+	Proof    []byte `json:"proof"`
+}
+
+type AuthSuccessPayload struct {
+	UserID      string `json:"user_id"`
+	DeviceID    string `json:"device_id"`
+	ContactCode string `json:"contact_code"`
+}
+
+type AuthFailurePayload struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
 type MessageSendPayload struct {
@@ -46,6 +86,7 @@ type MessageCreatedPayload struct {
 	MessageID          string   `json:"message_id"`
 	ConversationID     string   `json:"conversation_id"`
 	FromUserID         string   `json:"from_user_id"`
+	FromDeviceID       string   `json:"from_device_id"`
 	ParticipantUserIDs []string `json:"participant_user_ids"`
 	Body               string   `json:"body"`
 	SentAt             int64    `json:"sent_at"`
@@ -75,6 +116,7 @@ type ConversationCreatedPayload struct {
 	ConversationName   string   `json:"conversation_name,omitempty"`
 	ParticipantUserIDs []string `json:"participant_user_ids"`
 	FromUserID         string   `json:"from_user_id"`
+	FromDeviceID       string   `json:"from_device_id"`
 	FromContactCode    string   `json:"from_contact_code"`
 }
 
@@ -84,10 +126,12 @@ type ErrorPayload struct {
 }
 
 type PublicContactProfile struct {
-	UserID      string `json:"user_id,omitempty"`
-	ContactCode string `json:"contact_code"`
-	Name        string `json:"name"`
-	Username    string `json:"username"`
+	UserID          string `json:"user_id,omitempty"`
+	DeviceID        string `json:"device_id,omitempty"`
+	DevicePublicKey []byte `json:"device_public_key,omitempty"`
+	ContactCode     string `json:"contact_code"`
+	Name            string `json:"name"`
+	Username        string `json:"username"`
 }
 
 type ContactRequestSendPayload struct {

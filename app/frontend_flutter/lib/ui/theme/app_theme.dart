@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const appBackground = Color(0xFF24282D);
+  static const appBackground = Color.fromARGB(255, 25, 29, 33);
   static const appShell = Color(0xE614171B);
   static const navRail = Color(0xFF111317);
   static const navRailHover = Color(0xFF2A2F36);
@@ -21,7 +21,7 @@ class AppColors {
 
 ThemeData buildAppTheme() {
   const colorScheme = ColorScheme.dark(
-    primary: AppColors.accent,
+    primary: Color.fromARGB(255, 36, 62, 157),
     secondary: AppColors.accent,
     surface: AppColors.card,
     error: AppColors.error,

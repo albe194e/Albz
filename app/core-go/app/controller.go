@@ -7,11 +7,12 @@ import (
 )
 
 type Controller struct {
-	State          *AppState
-	Store          *storage.Store
-	Net            *network.Client
-	FileHandler    *file.Handler
-	OnStateChanged func()
+	State                    *AppState
+	Store                    *storage.Store
+	Net                      *network.Client
+	FileHandler              *file.Handler
+	UnlockedDevicePrivateKey []byte
+	OnStateChanged           func()
 }
 
 func (c *Controller) notifyStateChanged() {

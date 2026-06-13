@@ -7,14 +7,20 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/albe194e/albz/app/core-go/db/sqlc/sql"
 	"github.com/albe194e/albz/shared/protocol"
 	"github.com/google/uuid"
 )
 
+const (
+	ConversationTypeDirect = "direct"
+	ConversationTypeRoom   = "room"
+)
+
 func (c *Controller) GetConversationsByMe(ctx context.Context) ([]sql.Conversation, error) {
-	return c.Store.Q.GetConversationsByUserID(ctx, c.State.CurrentUser.ID)
+	return c.Store.Q.GetConversationsByUserID(ctx, c.State.CurrentUser.UserID)
 }
 
 func (c *Controller) CreateConversation(ctx context.Context, name string) error {
@@ -24,10 +30,10 @@ func (c *Controller) CreateConversation(ctx context.Context, name string) error 
 	}
 
 	params := sql.CreateConversationParams{
-		ID:   uuid.New().String()[:16],
+		ID:   uuid.NewString(),
 		Name: conversationName,
 	}
-	_, err := c.ensureConversationRecord(ctx, params.ID, conversationName, c.State.CurrentUser.ID)
+	_, err := c.ensureConversationRecord(ctx, params.ID, conversationName, c.State.CurrentUser.UserID)
 	return err
 }
 
@@ -47,7 +53,7 @@ func (c *Controller) CreateConversationWithUsers(ctx context.Context, name strin
 	}
 
 	params := sql.CreateConversationParams{
-		ID:   uuid.New().String()[:16],
+		ID:   uuid.NewString(),
 		Name: conversationName,
 	}
 	conversation, err := c.ensureConversationRecord(ctx, params.ID, conversationName, participantUserIDs...)
@@ -82,7 +88,7 @@ func (c *Controller) HandleConversationCreated(event protocol.Envelope[protocol.
 
 	participantUserIDs := event.Payload.ParticipantUserIDs
 	if len(participantUserIDs) == 0 {
-		participantUserIDs = []string{c.State.CurrentUser.ID, event.Payload.FromUserID}
+		participantUserIDs = []string{c.State.CurrentUser.UserID, event.Payload.FromUserID}
 	}
 
 	conversationName := c.conversationDisplayName(event.Payload.ConversationName, participantUserIDs)
@@ -119,7 +125,7 @@ func (c *Controller) CreateConversationWithContacts(ctx context.Context, name st
 	}
 
 	conversationName := c.conversationDisplayName(strings.TrimSpace(name), participantUserIDs)
-	conversationID := uuid.New().String()[:16]
+	conversationID := uuid.NewString()
 	conversation, err := c.ensureConversationRecord(ctx, conversationID, conversationName, participantUserIDs...)
 	if err != nil {
 		return sql.Conversation{}, err
@@ -150,7 +156,7 @@ func (c *Controller) conversationDisplayName(customName string, participantUserI
 	otherNames := make([]string, 0, len(participantUserIDs))
 	currentUserID := ""
 	if c != nil && c.State != nil && c.State.CurrentUser != nil {
-		currentUserID = c.State.CurrentUser.ID
+		currentUserID = c.State.CurrentUser.UserID
 	}
 
 	seen := make(map[string]struct{}, len(participantUserIDs))
@@ -184,10 +190,10 @@ func (c *Controller) normalizeConversationParticipantIDs(userIDs ...string) ([]s
 		return nil, nil, fmt.Errorf("no current user")
 	}
 
-	participantUserIDs := []string{c.State.CurrentUser.ID}
+	participantUserIDs := []string{c.State.CurrentUser.UserID}
 	recipientUserIDs := make([]string, 0, len(userIDs))
 	seen := map[string]struct{}{
-		c.State.CurrentUser.ID: {},
+		c.State.CurrentUser.UserID: {},
 	}
 
 	for _, userID := range userIDs {
@@ -243,6 +249,11 @@ func (c *Controller) ensureConversationRecord(ctx context.Context, conversationI
 		return sql.Conversation{}, fmt.Errorf("conversation name is required")
 	}
 
+	conversationType := ConversationTypeRoom
+	if len(participantIDs) == 2 {
+		conversationType = ConversationTypeDirect
+	}
+
 	conversation, err := c.Store.Q.GetConversationByID(ctx, conversationID)
 	if err != nil {
 		if !errors.Is(err, dsql.ErrNoRows) {
@@ -250,8 +261,11 @@ func (c *Controller) ensureConversationRecord(ctx context.Context, conversationI
 		}
 
 		conversation, err = c.Store.Q.CreateConversation(ctx, sql.CreateConversationParams{
-			ID:   conversationID,
-			Name: name,
+			ID:        conversationID,
+			Name:      name,
+			Type:      conversationType,
+			CreatedAt: time.Now().Unix(),
+			UpdatedAt: dsql.NullInt64{},
 		})
 		if err != nil {
 			return sql.Conversation{}, err
@@ -278,7 +292,8 @@ func (c *Controller) ensureConversationRecord(ctx context.Context, conversationI
 
 		if err := c.Store.Q.AddParticipant(ctx, sql.AddParticipantParams{
 			ConversationID: conversationID,
-			ParticipantID:  participantID,
+			UserID:         participantID,
+			CreatedAt:      time.Now().Unix(),
 		}); err != nil {
 			return sql.Conversation{}, err
 		}
@@ -297,7 +312,7 @@ func (c *Controller) reloadConversations(ctx context.Context) error {
 		return nil
 	}
 
-	conversations, err := c.Store.Q.GetConversationsByUserID(ctx, c.State.CurrentUser.ID)
+	conversations, err := c.Store.Q.GetConversationsByUserID(ctx, c.State.CurrentUser.UserID)
 	if err != nil {
 		return err
 	}
@@ -324,7 +339,7 @@ func (c *Controller) findDirectConversationWithUser(ctx context.Context, otherUs
 		hasCurrentUser := false
 		hasOtherUser := false
 		for _, participantID := range participantIDs {
-			if participantID == c.State.CurrentUser.ID {
+			if participantID == c.State.CurrentUser.UserID {
 				hasCurrentUser = true
 			}
 			if participantID == otherUserID {

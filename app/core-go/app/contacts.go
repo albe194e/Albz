@@ -7,27 +7,27 @@ import (
 )
 
 func ContactDisplayName(contact sql.Contact) string {
-	if strings.TrimSpace(contact.Name) != "" {
-		return contact.Name
+	if strings.TrimSpace(contact.DisplayName) != "" {
+		return contact.DisplayName
 	}
-	if strings.TrimSpace(contact.Username) != "" {
-		return contact.Username
+	if strings.TrimSpace(nullStringValue(contact.LocalHandle)) != "" {
+		return nullStringValue(contact.LocalHandle)
 	}
-	if strings.TrimSpace(contact.ContactCode) != "" {
-		return contact.ContactCode
+	if strings.TrimSpace(nullStringValue(contact.ContactCode)) != "" {
+		return nullStringValue(contact.ContactCode)
 	}
 	return contact.UserID
 }
 
 func ContactRequestDisplayName(request sql.ContactRequest) string {
-	if strings.TrimSpace(request.Name) != "" {
-		return request.Name
+	if strings.TrimSpace(request.DisplayName) != "" {
+		return request.DisplayName
 	}
-	if strings.TrimSpace(request.Username) != "" {
-		return request.Username
+	if strings.TrimSpace(nullStringValue(request.LocalHandle)) != "" {
+		return nullStringValue(request.LocalHandle)
 	}
-	if strings.TrimSpace(request.FromContactCode) != "" {
-		return request.FromContactCode
+	if strings.TrimSpace(nullStringValue(request.FromContactCode)) != "" {
+		return nullStringValue(request.FromContactCode)
 	}
 	return request.FromUserID
 }

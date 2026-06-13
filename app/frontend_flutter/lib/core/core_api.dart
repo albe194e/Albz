@@ -106,6 +106,19 @@ typedef _CoreSaveProfileImageDart =
       Pointer<Utf8> filename,
     );
 
+final class _CoreByteBuffer extends Struct {
+  external Pointer<Uint8> data;
+
+  @Int32()
+  external int len;
+}
+
+typedef _CoreGetQrContactNative = _CoreByteBuffer Function(Uint64 handle);
+typedef _CoreGetQrContactDart = _CoreByteBuffer Function(int handle);
+
+typedef _CoreBytesFreeNative = Void Function(Pointer<Uint8> value);
+typedef _CoreBytesFreeDart = void Function(Pointer<Uint8> value);
+
 typedef _CorePollEventJSONNative = Pointer<Utf8> Function(Uint64 handle);
 typedef _CorePollEventJSONDart = Pointer<Utf8> Function(int handle);
 
@@ -482,6 +495,14 @@ class CoreApi {
             _CoreSaveProfileImageNative,
             _CoreSaveProfileImageDart
           >('core_save_profile_image'),
+      _coreGetQrContact = library
+          .lookupFunction<_CoreGetQrContactNative, _CoreGetQrContactDart>(
+            'core_get_qr_contact',
+          ),
+      _coreBytesFree = library
+          .lookupFunction<_CoreBytesFreeNative, _CoreBytesFreeDart>(
+            'core_bytes_free',
+          ),
       _corePollEventJSON = library
           .lookupFunction<_CorePollEventJSONNative, _CorePollEventJSONDart>(
             'core_poll_event_json',
@@ -510,6 +531,8 @@ class CoreApi {
   final _CoreContactActionDart _coreAcceptContactRequest;
   final _CoreContactActionDart _coreRejectContactRequest;
   final _CoreSaveProfileImageDart _coreSaveProfileImage;
+  final _CoreGetQrContactDart _coreGetQrContact;
+  final _CoreBytesFreeDart _coreBytesFree;
   final _CorePollEventJSONDart _corePollEventJSON;
   final _CoreTakeLastErrorDart _coreTakeLastError;
   final _CoreStringFreeDart _coreStringFree;
@@ -776,6 +799,21 @@ class CoreApi {
     }
   }
 
+  Uint8List getContactQrCodePng() {
+    final handle = _requireHandle();
+    final buffer = _coreGetQrContact(handle);
+    if (buffer.data == nullptr || buffer.len <= 0) {
+      throw CoreApiError(_takeLastErrorMessage());
+    }
+
+    try {
+      final nativeBytes = buffer.data.asTypedList(buffer.len);
+      return Uint8List.fromList(nativeBytes);
+    } finally {
+      _coreBytesFree(buffer.data);
+    }
+  }
+
   CoreEvent? pollEvent() {
     final handle = _requireHandle();
     final pointer = _corePollEventJSON(handle);
@@ -842,16 +880,16 @@ class CoreApi {
 
   static String _defaultLibraryPath() {
     if (Platform.isAndroid) {
-      return 'libalbz_core.so';
+      return 'libhaddle_core.so';
     }
     if (Platform.isWindows) {
-      return 'albz_core.dll';
+      return 'haddle_core.dll';
     }
     if (Platform.isLinux) {
-      return 'libalbz_core.so';
+      return 'libhaddle_core.so';
     }
     if (Platform.isMacOS) {
-      return 'libalbz_core.dylib';
+      return 'libhaddle_core.dylib';
     }
 
     throw UnsupportedError('Unsupported platform for core-go library loading');

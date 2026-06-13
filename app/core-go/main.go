@@ -3,46 +3,46 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 
+	corelog "github.com/albe194e/albz/app/core-go/logging"
 	coreruntime "github.com/albe194e/albz/app/core-go/runtime"
 )
 
 func main() {
 	options, err := loadOptions(os.Args[1:])
 	if err != nil {
-		fmt.Printf("failed to load runtime options: %v\n", err)
+		corelog.Errorf("failed to load runtime options: %v", err)
 		return
 	}
 
 	service, err := coreruntime.New(context.Background(), options)
 	if err != nil {
-		fmt.Printf("failed to start core runtime: %v\n", err)
+		corelog.Errorf("failed to start core runtime: %v", err)
 		return
 	}
 	defer func() {
 		if err := service.Close(); err != nil {
-			fmt.Printf("failed to close core runtime: %v\n", err)
+			corelog.Errorf("failed to close core runtime: %v", err)
 		}
 	}()
 
-	fmt.Printf("core-go database: %s\n", service.Config.DBPath)
+	corelog.Infof("core-go database: %s", service.Config.DBPath)
 	loaded, err := service.TryLoadSession(context.Background())
 	if err != nil {
-		fmt.Printf("failed to verify local session: %v\n", err)
+		corelog.Errorf("failed to verify local session: %v", err)
 		return
 	}
 	if loaded {
-		fmt.Println("loaded existing local session")
+		corelog.Infof("loaded existing local session")
 	} else {
-		fmt.Println("no active local session")
+		corelog.Infof("no active local session")
 	}
 
-	fmt.Println("core-go runtime ready")
+	corelog.Infof("core-go runtime ready")
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
@@ -61,7 +61,7 @@ func loadOptions(args []string) (coreruntime.Options, error) {
 
 	serverURL := strings.TrimSpace(*serverURLFlag)
 	if serverURL == "" {
-		serverURL = strings.TrimSpace(os.Getenv("ALBZ_SERVER_WS_URL"))
+		serverURL = strings.TrimSpace(os.Getenv("HADDLE_SERVER_WS_URL"))
 	}
 
 	return coreruntime.Options{

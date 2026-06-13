@@ -45,7 +45,7 @@ class LandingPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Albz',
+                        'Haddle',
                         style: Theme.of(context).textTheme.headlineLarge,
                       ),
                       const SizedBox(height: 24),

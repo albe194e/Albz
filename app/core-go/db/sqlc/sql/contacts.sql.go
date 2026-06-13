@@ -7,10 +7,11 @@ package sql
 
 import (
 	"context"
+	"database/sql"
 )
 
 const listContacts = `-- name: ListContacts :many
-SELECT id, user_id, name, username, profile_picture_url, contact_code, created_at
+SELECT id, user_id, display_name, local_handle, profile_picture_path, contact_code, created_at
 FROM contacts
 ORDER BY created_at ASC
 `
@@ -27,9 +28,9 @@ func (q *Queries) ListContacts(ctx context.Context) ([]Contact, error) {
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
-			&i.Name,
-			&i.Username,
-			&i.ProfilePictureUrl,
+			&i.DisplayName,
+			&i.LocalHandle,
+			&i.ProfilePicturePath,
 			&i.ContactCode,
 			&i.CreatedAt,
 		); err != nil {
@@ -48,39 +49,39 @@ func (q *Queries) ListContacts(ctx context.Context) ([]Contact, error) {
 
 const upsertContact = `-- name: UpsertContact :exec
 INSERT INTO contacts (
-  user_id,
-  name,
-  username,
-  contact_code,
-	profile_picture_url,
-  created_at
+	user_id,
+	display_name,
+	local_handle,
+	contact_code,
+	profile_picture_path,
+	created_at
 ) VALUES (
-  ?, ?, ?, ?, ?, ?
+	?, ?, ?, ?, ?, ?
 )
 ON CONFLICT(user_id) DO UPDATE SET
-  name = excluded.name,
-  username = excluded.username,
-  contact_code = excluded.contact_code,
-  profile_picture_url = excluded.profile_picture_url,
-  created_at = excluded.created_at
+	display_name = excluded.display_name,
+	local_handle = excluded.local_handle,
+	contact_code = excluded.contact_code,
+	profile_picture_path = excluded.profile_picture_path,
+	created_at = excluded.created_at
 `
 
 type UpsertContactParams struct {
-	UserID            string `db:"user_id" json:"user_id"`
-	Name              string `db:"name" json:"name"`
-	Username          string `db:"username" json:"username"`
-	ContactCode       string `db:"contact_code" json:"contact_code"`
-	ProfilePictureUrl string `db:"profile_picture_url" json:"profile_picture_url"`
-	CreatedAt         int64  `db:"created_at" json:"created_at"`
+	UserID             string         `db:"user_id" json:"user_id"`
+	DisplayName        string         `db:"display_name" json:"display_name"`
+	LocalHandle        sql.NullString `db:"local_handle" json:"local_handle"`
+	ContactCode        sql.NullString `db:"contact_code" json:"contact_code"`
+	ProfilePicturePath sql.NullString `db:"profile_picture_path" json:"profile_picture_path"`
+	CreatedAt          int64          `db:"created_at" json:"created_at"`
 }
 
 func (q *Queries) UpsertContact(ctx context.Context, arg UpsertContactParams) error {
 	_, err := q.db.ExecContext(ctx, upsertContact,
 		arg.UserID,
-		arg.Name,
-		arg.Username,
+		arg.DisplayName,
+		arg.LocalHandle,
 		arg.ContactCode,
-		arg.ProfilePictureUrl,
+		arg.ProfilePicturePath,
 		arg.CreatedAt,
 	)
 	return err

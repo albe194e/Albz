@@ -1,12 +1,12 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'app/app_controller.dart';
 import 'app/app_page.dart';
 import 'app/app_scope.dart';
+import 'core/app_log.dart';
 import 'platform/desktop_window.dart';
 import 'ui/components/navigation/app_shell.dart';
 import 'ui/components/navigation/desktop_title_bar.dart';
@@ -17,27 +17,25 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await DesktopWindow.configure();
 
-  const profileName = String.fromEnvironment('ALBZ_PROFILE');
-  const configuredDataDir = String.fromEnvironment('ALBZ_DATA_DIR');
+  const profileName = String.fromEnvironment('HADDLE_PROFILE');
+  const configuredDataDir = String.fromEnvironment('HADDLE_DATA_DIR');
   const serverUrl = String.fromEnvironment(
-    'ALBZ_SERVER_WS_URL',
+    'HADDLE_SERVER_WS_URL',
     defaultValue: 'wss://oncological-paroxysmal-karolyn.ngrok-free.dev/ws',
   );
   final resolvedDataDir = configuredDataDir.isEmpty
       ? await _resolveDefaultDataDir()
       : configuredDataDir;
 
-  if (kDebugMode) {
-    debugPrint(
-      '[albz] Flutter startup config: '
-      'profile="${profileName.isEmpty ? '(default)' : profileName}", '
-      'dataDir="${resolvedDataDir ?? '(core-go default)'}", '
-      'serverUrl="$serverUrl"',
-    );
-  }
+  AppLog.info(
+    'Flutter startup config: '
+    'profile="${profileName.isEmpty ? '(default)' : profileName}", '
+    'dataDir="${resolvedDataDir ?? '(core-go default)'}", '
+    'serverUrl="$serverUrl"',
+  );
 
   runApp(
-    AlbzApp(
+    HaddleApp(
       profileName: profileName,
       dataDir: resolvedDataDir,
       serverUrl: serverUrl,
@@ -46,7 +44,7 @@ Future<void> main() async {
 }
 
 Future<String?> _resolveDefaultDataDir() async {
-  if (!Platform.isAndroid) {
+  if (!Platform.isAndroid && !Platform.isIOS) {
     return null;
   }
 
@@ -58,8 +56,8 @@ Future<String?> _resolveDefaultDataDir() async {
   ].join(Platform.pathSeparator);
 }
 
-class AlbzApp extends StatefulWidget {
-  const AlbzApp({
+class HaddleApp extends StatefulWidget {
+  const HaddleApp({
     super.key,
     this.profileName = '',
     this.dataDir,
@@ -71,10 +69,10 @@ class AlbzApp extends StatefulWidget {
   final String serverUrl;
 
   @override
-  State<AlbzApp> createState() => _AlbzAppState();
+  State<HaddleApp> createState() => _HaddleAppState();
 }
 
-class _AlbzAppState extends State<AlbzApp> {
+class _HaddleAppState extends State<HaddleApp> {
   late final AppController _controller;
 
   @override
@@ -101,8 +99,8 @@ class _AlbzAppState extends State<AlbzApp> {
       controller: _controller,
       child: MaterialApp(
         title: widget.profileName.isEmpty
-            ? 'Albz Flutter'
-            : 'Albz Flutter (${widget.profileName})',
+            ? 'Haddle'
+            : 'Haddle (${widget.profileName})',
         theme: buildAppTheme(),
         home: AnimatedBuilder(
           animation: _controller,

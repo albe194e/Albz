@@ -41,11 +41,11 @@ Android shortcut:
 - `make run-client-android`
 - if more than one Android target is connected: `make run-client-android DEVICE=<flutter-device-id>`
 
-The named-profile shortcuts use `--dart-define=ALBZ_PROFILE=<name>` so the Flutter app initializes `core-go` with separate local profile roots.
+The named-profile shortcuts use `--dart-define=HADDLE_PROFILE=<name>` so the Flutter app initializes `core-go` with separate local profile roots.
 
 The multi-window shortcuts (`make run-clients`, `make run-dev`, `make stop-dev`) are backed by PowerShell helper scripts in `scripts/` so Windows path quoting does not break the spawned Flutter terminals.
 
-`make run-client` now uses the normal repo-local desktop development database path again. `make reset-client-data` removes that repo-local data plus the old legacy Flutter fallback directory under `%LOCALAPPDATA%\Albz\frontend_flutter` so you can fully reset local accounts and sessions during development.
+`make run-client` now uses the normal repo-local desktop development database path again. `make reset-client-data` removes that repo-local data plus the old legacy Flutter fallback directory under `%LOCALAPPDATA%\Haddle\frontend_flutter` so you can fully reset local accounts and sessions during development.
 
 Windows plugin note:
 
@@ -55,10 +55,10 @@ Windows plugin note:
 
 The Go build target writes:
 
-- `app/frontend_flutter/native/windows/albz_core.dll`
-- `app/frontend_flutter/native/windows/albz_core.h`
+- `app/frontend_flutter/native/windows/haddle_core.dll`
+- `app/frontend_flutter/native/windows/haddle_core.h`
 
-The Windows Flutter build installs `albz_core.dll` next to the app executable so Dart FFI can load it with `DynamicLibrary.open("albz_core.dll")`.
+The Windows Flutter build installs `haddle_core.dll` next to the app executable so Dart FFI can load it with `DynamicLibrary.open("haddle_core.dll")`.
 
 ## When to rebuild what
 

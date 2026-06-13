@@ -9,22 +9,28 @@ import (
 	"context"
 )
 
-const getUserByID = `-- name: GetUserByID :one
-SELECT id, name, username, hashed_password, profile_picture_url, contact_code
-FROM users
-WHERE id = ?
+const getLocalIdentityByUserID = `-- name: GetLocalIdentityByUserID :one
+SELECT id, user_id, device_id, device_public_key, encrypted_device_private_key, kdf_salt, kdf_params, name, local_handle, profile_picture_path, contact_code, created_at
+FROM local_identity
+WHERE user_id = ?
 `
 
-func (q *Queries) GetUserByID(ctx context.Context, id string) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByID, id)
-	var i User
+func (q *Queries) GetLocalIdentityByUserID(ctx context.Context, userID string) (LocalIdentity, error) {
+	row := q.db.QueryRowContext(ctx, getLocalIdentityByUserID, userID)
+	var i LocalIdentity
 	err := row.Scan(
 		&i.ID,
+		&i.UserID,
+		&i.DeviceID,
+		&i.DevicePublicKey,
+		&i.EncryptedDevicePrivateKey,
+		&i.KdfSalt,
+		&i.KdfParams,
 		&i.Name,
-		&i.Username,
-		&i.HashedPassword,
-		&i.ProfilePictureUrl,
+		&i.LocalHandle,
+		&i.ProfilePicturePath,
 		&i.ContactCode,
+		&i.CreatedAt,
 	)
 	return i, err
 }

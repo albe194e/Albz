@@ -1,13 +1,17 @@
 -- name: CreateMessage :exec
 INSERT INTO messages (
-  conversation_id,
-  sender_id,
-  client_message_id,
-  body,
-  created_at,
-  delivery_state
+	id,
+	conversation_id,
+	sender_user_id,
+	sender_device_id,
+	client_message_id,
+	body,
+	created_at,
+	received_at,
+	direction,
+	delivery_state
 ) VALUES (
-  ?, ?, ?, ?, ?, ?
+	?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 );
 
 -- name: GetMessage :one
@@ -18,13 +22,13 @@ WHERE id = ?;
 -- name: GetMessages :many
 SELECT *
 FROM messages
-ORDER BY created_at ASC;
+ORDER BY created_at ASC, id ASC;
 
 -- name: ListMessagesByConversation :many
 SELECT *
 FROM messages
 WHERE conversation_id = ?
-ORDER BY created_at ASC;
+ORDER BY created_at ASC, id ASC;
 
 -- name: UpdateMessageDeliveryStateByClientMessageID :exec
 UPDATE messages

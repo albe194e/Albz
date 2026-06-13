@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/albe194e/albz/app/core-go/app/qr"
 	"github.com/albe194e/albz/shared/protocol"
 	"github.com/google/uuid"
 )
@@ -41,7 +42,7 @@ func (c *Controller) SendContactRequest(ctx context.Context, contactCode string)
 	if trimmedContactCode == "" {
 		return fmt.Errorf("contact code is required")
 	}
-	if trimmedContactCode == c.State.CurrentUser.ContactCode {
+	if trimmedContactCode == nullStringValue(c.State.CurrentUser.ContactCode) {
 		return fmt.Errorf("cannot send a contact request to yourself")
 	}
 
@@ -96,15 +97,25 @@ func (c *Controller) RejectContactRequest(ctx context.Context, fromUserID string
 	})
 }
 
+func (c *Controller) GetContactQRCode() ([]byte, error) {
+	if c == nil || c.State == nil || c.State.CurrentUser == nil {
+		return nil, fmt.Errorf("no current user")
+	}
+
+	return qr.GenerateContactQRCode(nullStringValue(c.State.CurrentUser.ContactCode))
+}
+
 func (c *Controller) currentPublicContactProfile() protocol.PublicContactProfile {
 	if c == nil || c.State == nil || c.State.CurrentUser == nil {
 		return protocol.PublicContactProfile{}
 	}
 
 	return protocol.PublicContactProfile{
-		UserID:      c.State.CurrentUser.ID,
-		ContactCode: c.State.CurrentUser.ContactCode,
-		Name:        c.State.CurrentUser.Name,
-		Username:    c.State.CurrentUser.Username,
+		UserID:          c.State.CurrentUser.UserID,
+		DeviceID:        c.State.CurrentUser.DeviceID,
+		DevicePublicKey: append([]byte(nil), c.State.CurrentUser.DevicePublicKey...),
+		ContactCode:     nullStringValue(c.State.CurrentUser.ContactCode),
+		Name:            c.State.CurrentUser.Name,
+		Username:        nullStringValue(c.State.CurrentUser.LocalHandle),
 	}
 }

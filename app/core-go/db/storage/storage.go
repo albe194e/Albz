@@ -42,16 +42,19 @@ func OpenSQLite(ctx context.Context, dbPath string, schemaSQL string) (*Store, e
 		return nil, fmt.Errorf("ping sqlite: %w", err)
 	}
 
-	schemaBytes := []byte(schemaSQL)
-
-	if _, err := conn.ExecContext(ctx, string(schemaBytes)); err != nil {
+	if _, err := conn.ExecContext(ctx, schemaSQL); err != nil {
 		_ = conn.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
 
-	if err := migrateUsersTable(ctx, conn, schemaBytes); err != nil {
+	if err := migrateLocalIdentityTable(ctx, conn); err != nil {
 		_ = conn.Close()
-		return nil, fmt.Errorf("migrate users table: %w", err)
+		return nil, fmt.Errorf("migrate local identity table: %w", err)
+	}
+
+	if err := migrateSessionsTable(ctx, conn); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("migrate sessions table: %w", err)
 	}
 
 	if err := migrateConversationsTable(ctx, conn); err != nil {
@@ -59,7 +62,12 @@ func OpenSQLite(ctx context.Context, dbPath string, schemaSQL string) (*Store, e
 		return nil, fmt.Errorf("migrate conversations table: %w", err)
 	}
 
-	if err := migrateMessagesTable(ctx, conn, schemaBytes); err != nil {
+	if err := migrateConversationParticipantsTable(ctx, conn); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("migrate conversation participants table: %w", err)
+	}
+
+	if err := migrateMessagesTable(ctx, conn); err != nil {
 		_ = conn.Close()
 		return nil, fmt.Errorf("migrate messages table: %w", err)
 	}
@@ -80,202 +88,43 @@ func OpenSQLite(ctx context.Context, dbPath string, schemaSQL string) (*Store, e
 	}, nil
 }
 
-func migrateUsersTable(ctx context.Context, conn *sql.DB, schemaBytes []byte) error {
-	needsMigration, err := usersTableNeedsIDMigration(ctx, conn)
-	if err != nil {
-		return err
-	}
-	if needsMigration {
-		tx, err := conn.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("begin users migration tx: %w", err)
-		}
-		defer func() {
-			_ = tx.Rollback()
-		}()
-
-		if _, err := tx.ExecContext(ctx, `DROP TABLE IF EXISTS users_legacy;`); err != nil {
-			return fmt.Errorf("drop stale legacy users table: %w", err)
-		}
-
-		if _, err := tx.ExecContext(ctx, `ALTER TABLE users RENAME TO users_legacy;`); err != nil {
-			return fmt.Errorf("rename legacy users table: %w", err)
-		}
-
-		if _, err := tx.ExecContext(ctx, string(schemaBytes)); err != nil {
-			return fmt.Errorf("create migrated users table: %w", err)
-		}
-
-		legacyColumns, err := tableColumnNames(ctx, tx, "users_legacy")
-		if err != nil {
-			return err
-		}
-
-		idExpr := "id"
-		if _, ok := legacyColumns["id"]; !ok {
-			if _, ok := legacyColumns["uuid"]; ok {
-				idExpr = "uuid"
-			} else {
-				return fmt.Errorf("legacy users table is missing both id and uuid columns")
-			}
-		}
-
-		nameExpr := "name"
-		if _, ok := legacyColumns["name"]; !ok {
-			return fmt.Errorf("legacy users table is missing required column %q", "name")
-		}
-
-		usernameExpr := "username"
-		if _, ok := legacyColumns["username"]; !ok {
-			usernameExpr = idExpr
-		}
-
-		hashedPasswordExpr := "hashed_password"
-		if _, ok := legacyColumns["hashed_password"]; !ok {
-			hashedPasswordExpr = "''"
-		}
-
-		contactCodeExpr := "contact_code"
-		if _, ok := legacyColumns["contact_code"]; !ok {
-			if _, ok := legacyColumns["friend_code"]; ok {
-				contactCodeExpr = "friend_code"
-			} else {
-				contactCodeExpr = "'ALBZ-' || UPPER(HEX(RANDOMBLOB(6)))"
-			}
-		}
-
-		profilePictureExpr := "profile_picture_url"
-		if _, ok := legacyColumns["profile_picture_url"]; !ok {
-			profilePictureExpr = "''"
-		}
-
-		copyQuery := fmt.Sprintf(`
-INSERT INTO users (
-  id,
-  name,
-  username,
-  hashed_password,
-  profile_picture_url,
-  contact_code
-)
-SELECT
-  %s,
-  %s,
-  %s,
-  %s,
-  %s,
-  %s
-FROM users_legacy;
-`, idExpr, nameExpr, usernameExpr, hashedPasswordExpr, profilePictureExpr, contactCodeExpr)
-
-		if _, err := tx.ExecContext(ctx, copyQuery); err != nil {
-			return fmt.Errorf("copy legacy users: %w", err)
-		}
-
-		if _, err := tx.ExecContext(ctx, `DROP TABLE users_legacy;`); err != nil {
-			return fmt.Errorf("drop legacy users table: %w", err)
-		}
-
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit users migration: %w", err)
-		}
-	}
-
-	columnTypes, err := tableColumnTypes(ctx, conn, "users")
+func migrateLocalIdentityTable(ctx context.Context, conn *sql.DB) error {
+	columnTypes, err := tableColumnTypes(ctx, conn, "local_identity")
 	if err != nil {
 		return err
 	}
 
-	if _, ok := columnTypes["profile_picture_url"]; !ok {
-		if _, err := conn.ExecContext(ctx, `ALTER TABLE users ADD COLUMN profile_picture_url TEXT NOT NULL DEFAULT '';`); err != nil {
-			return fmt.Errorf("add users.profile_picture_url column: %w", err)
+	requiredColumns := []string{
+		"user_id",
+		"device_id",
+		"device_public_key",
+		"encrypted_device_private_key",
+		"kdf_salt",
+		"kdf_params",
+		"name",
+		"created_at",
+	}
+	for _, column := range requiredColumns {
+		if _, ok := columnTypes[column]; !ok {
+			return fmt.Errorf("local_identity table is missing required column %q", column)
 		}
 	}
 
 	return nil
 }
 
-func migrateMessagesTable(ctx context.Context, conn *sql.DB, schemaBytes []byte) error {
-	needsMigration, err := messagesTableNeedsMigration(ctx, conn)
+func migrateSessionsTable(ctx context.Context, conn *sql.DB) error {
+	columnTypes, err := tableColumnTypes(ctx, conn, "sessions")
 	if err != nil {
 		return err
 	}
-	if !needsMigration {
+
+	if _, ok := columnTypes["device_id"]; ok {
 		return nil
 	}
 
-	tx, err := conn.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin migration tx: %w", err)
-	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
-
-	if _, err := tx.ExecContext(ctx, `DROP TABLE IF EXISTS messages_legacy;`); err != nil {
-		return fmt.Errorf("drop stale legacy table: %w", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, `ALTER TABLE messages RENAME TO messages_legacy;`); err != nil {
-		return fmt.Errorf("rename legacy messages table: %w", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, string(schemaBytes)); err != nil {
-		return fmt.Errorf("create migrated messages table: %w", err)
-	}
-
-	legacyColumns, err := tableColumnNames(ctx, tx, "messages_legacy")
-	if err != nil {
-		return err
-	}
-
-	requiredColumns := []string{"conversation_id", "sender_id", "body", "created_at"}
-	for _, column := range requiredColumns {
-		if _, ok := legacyColumns[column]; !ok {
-			return fmt.Errorf("legacy messages table is missing required column %q", column)
-		}
-	}
-
-	clientMessageIDExpr := "'legacy-' || rowid"
-	if _, ok := legacyColumns["client_message_id"]; ok {
-		clientMessageIDExpr = "client_message_id"
-	}
-
-	deliveryStateExpr := "'delivered'"
-	if _, ok := legacyColumns["delivery_state"]; ok {
-		deliveryStateExpr = "delivery_state"
-	}
-
-	copyQuery := fmt.Sprintf(`
-INSERT INTO messages (
-  conversation_id,
-  sender_id,
-  client_message_id,
-  body,
-  created_at,
-  delivery_state
-)
-SELECT
-  conversation_id,
-  sender_id,
-  %s,
-  body,
-  created_at,
-  %s
-FROM messages_legacy
-ORDER BY created_at ASC, rowid ASC;
-`, clientMessageIDExpr, deliveryStateExpr)
-
-	if _, err := tx.ExecContext(ctx, copyQuery); err != nil {
-		return fmt.Errorf("copy legacy messages: %w", err)
-	}
-
-	if _, err := tx.ExecContext(ctx, `DROP TABLE messages_legacy;`); err != nil {
-		return fmt.Errorf("drop legacy messages table: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit migration: %w", err)
+	if _, err := conn.ExecContext(ctx, `ALTER TABLE sessions ADD COLUMN device_id TEXT NOT NULL DEFAULT '';`); err != nil {
+		return fmt.Errorf("add sessions.device_id column: %w", err)
 	}
 
 	return nil
@@ -287,12 +136,256 @@ func migrateConversationsTable(ctx context.Context, conn *sql.DB) error {
 		return err
 	}
 
-	if _, ok := columnTypes["name"]; ok {
+	if _, ok := columnTypes["type"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE conversations ADD COLUMN type TEXT NOT NULL DEFAULT 'direct';`); err != nil {
+			return fmt.Errorf("add conversations.type column: %w", err)
+		}
+	}
+
+	if _, ok := columnTypes["created_at"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE conversations ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;`); err != nil {
+			return fmt.Errorf("add conversations.created_at column: %w", err)
+		}
+	}
+
+	if _, ok := columnTypes["updated_at"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE conversations ADD COLUMN updated_at INTEGER;`); err != nil {
+			return fmt.Errorf("add conversations.updated_at column: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func migrateConversationParticipantsTable(ctx context.Context, conn *sql.DB) error {
+	columnTypes, err := tableColumnTypes(ctx, conn, "conversation_participants")
+	if err != nil {
+		return err
+	}
+
+	if _, ok := columnTypes["user_id"]; ok {
+		if _, ok := columnTypes["created_at"]; ok {
+			return nil
+		}
+
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE conversation_participants ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0;`); err != nil {
+			return fmt.Errorf("add conversation_participants.created_at column: %w", err)
+		}
+
 		return nil
 	}
 
-	if _, err := conn.ExecContext(ctx, `ALTER TABLE conversations ADD COLUMN name TEXT NOT NULL DEFAULT '';`); err != nil {
-		return fmt.Errorf("add conversations.name column: %w", err)
+	if _, ok := columnTypes["participant_id"]; !ok {
+		return nil
+	}
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin conversation participants migration tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	if _, err := tx.ExecContext(ctx, `DROP TABLE IF EXISTS conversation_participants_legacy;`); err != nil {
+		return fmt.Errorf("drop stale legacy conversation participants table: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `ALTER TABLE conversation_participants RENAME TO conversation_participants_legacy;`); err != nil {
+		return fmt.Errorf("rename legacy conversation participants table: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+CREATE TABLE conversation_participants (
+	id INTEGER PRIMARY KEY,
+	conversation_id TEXT NOT NULL,
+	user_id TEXT NOT NULL,
+	created_at INTEGER NOT NULL,
+	FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+);
+`); err != nil {
+		return fmt.Errorf("create migrated conversation participants table: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+INSERT INTO conversation_participants (
+	id,
+	conversation_id,
+	user_id,
+	created_at
+)
+SELECT
+	id,
+	conversation_id,
+	participant_id,
+	0
+FROM conversation_participants_legacy;
+`); err != nil {
+		return fmt.Errorf("copy legacy conversation participants: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `DROP TABLE conversation_participants_legacy;`); err != nil {
+		return fmt.Errorf("drop legacy conversation participants table: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+CREATE UNIQUE INDEX IF NOT EXISTS idx_conversation_participants_unique
+ON conversation_participants (conversation_id, user_id);
+`); err != nil {
+		return fmt.Errorf("create conversation participants unique index: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit conversation participants migration: %w", err)
+	}
+
+	return nil
+}
+
+func migrateMessagesTable(ctx context.Context, conn *sql.DB) error {
+	needsMigration, err := messagesTableNeedsMigration(ctx, conn)
+	if err != nil {
+		return err
+	}
+	if !needsMigration {
+		return nil
+	}
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin messages migration tx: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	if _, err := tx.ExecContext(ctx, `DROP TABLE IF EXISTS messages_legacy;`); err != nil {
+		return fmt.Errorf("drop stale legacy messages table: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `ALTER TABLE messages RENAME TO messages_legacy;`); err != nil {
+		return fmt.Errorf("rename legacy messages table: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+CREATE TABLE messages (
+	id TEXT PRIMARY KEY,
+	conversation_id TEXT NOT NULL,
+	sender_user_id TEXT NOT NULL,
+	sender_device_id TEXT,
+	client_message_id TEXT NOT NULL,
+	body TEXT NOT NULL,
+	created_at INTEGER NOT NULL,
+	received_at INTEGER,
+	direction TEXT NOT NULL,
+	delivery_state TEXT NOT NULL,
+	FOREIGN KEY (conversation_id) REFERENCES conversations(id)
+);
+`); err != nil {
+		return fmt.Errorf("create migrated messages table: %w", err)
+	}
+
+	legacyColumns, err := tableColumnNames(ctx, tx, "messages_legacy")
+	if err != nil {
+		return err
+	}
+
+	requiredColumns := []string{"conversation_id", "body", "created_at"}
+	for _, column := range requiredColumns {
+		if _, ok := legacyColumns[column]; !ok {
+			return fmt.Errorf("legacy messages table is missing required column %q", column)
+		}
+	}
+
+	senderUserExpr := "sender_user_id"
+	if _, ok := legacyColumns["sender_user_id"]; !ok {
+		if _, ok := legacyColumns["sender_id"]; ok {
+			senderUserExpr = "sender_id"
+		} else {
+			return fmt.Errorf("legacy messages table is missing sender_user_id/sender_id")
+		}
+	}
+
+	messageIDExpr := "'legacy-' || rowid"
+	if _, ok := legacyColumns["id"]; ok {
+		messageIDExpr = "CAST(id AS TEXT)"
+	}
+
+	clientMessageIDExpr := "'legacy-client-' || rowid"
+	if _, ok := legacyColumns["client_message_id"]; ok {
+		clientMessageIDExpr = "client_message_id"
+	}
+
+	receivedAtExpr := "NULL"
+	if _, ok := legacyColumns["received_at"]; ok {
+		receivedAtExpr = "received_at"
+	}
+
+	directionExpr := fmt.Sprintf(
+		"CASE WHEN %s = COALESCE((SELECT user_id FROM local_identity WHERE id = 1), (SELECT user_id FROM sessions WHERE id = 1)) THEN 'outgoing' ELSE 'incoming' END",
+		senderUserExpr,
+	)
+	if _, ok := legacyColumns["direction"]; ok {
+		directionExpr = "direction"
+	}
+
+	deliveryStateExpr := "'delivered'"
+	if _, ok := legacyColumns["delivery_state"]; ok {
+		deliveryStateExpr = "delivery_state"
+	}
+
+	copyQuery := fmt.Sprintf(`
+INSERT INTO messages (
+	id,
+	conversation_id,
+	sender_user_id,
+	sender_device_id,
+	client_message_id,
+	body,
+	created_at,
+	received_at,
+	direction,
+	delivery_state
+)
+SELECT
+	%s,
+	conversation_id,
+	%s,
+	NULL,
+	%s,
+	body,
+	created_at,
+	%s,
+	%s,
+	%s
+FROM messages_legacy
+ORDER BY created_at ASC, rowid ASC;
+`, messageIDExpr, senderUserExpr, clientMessageIDExpr, receivedAtExpr, directionExpr, deliveryStateExpr)
+
+	if _, err := tx.ExecContext(ctx, copyQuery); err != nil {
+		return fmt.Errorf("copy legacy messages: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `DROP TABLE messages_legacy;`); err != nil {
+		return fmt.Errorf("drop legacy messages table: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_created
+ON messages (conversation_id, created_at);
+`); err != nil {
+		return fmt.Errorf("create messages conversation index: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_client_message_id
+ON messages (client_message_id);
+`); err != nil {
+		return fmt.Errorf("create messages client message index: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit messages migration: %w", err)
 	}
 
 	return nil
@@ -314,21 +407,56 @@ func migrateContactsTable(ctx context.Context, conn *sql.DB) error {
 		return err
 	}
 
-	if _, ok := columnTypes["name"]; !ok {
-		if _, err := conn.ExecContext(ctx, `ALTER TABLE contacts ADD COLUMN name TEXT NOT NULL DEFAULT '';`); err != nil {
-			return fmt.Errorf("add contacts.name column: %w", err)
+	if _, ok := columnTypes["display_name"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE contacts ADD COLUMN display_name TEXT NOT NULL DEFAULT '';`); err != nil {
+			return fmt.Errorf("add contacts.display_name column: %w", err)
 		}
 	}
 
-	if _, ok := columnTypes["username"]; !ok {
-		if _, err := conn.ExecContext(ctx, `ALTER TABLE contacts ADD COLUMN username TEXT NOT NULL DEFAULT '';`); err != nil {
-			return fmt.Errorf("add contacts.username column: %w", err)
+	if _, ok := columnTypes["local_handle"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE contacts ADD COLUMN local_handle TEXT;`); err != nil {
+			return fmt.Errorf("add contacts.local_handle column: %w", err)
 		}
 	}
 
-	if _, ok := columnTypes["profile_picture_url"]; !ok {
-		if _, err := conn.ExecContext(ctx, `ALTER TABLE contacts ADD COLUMN profile_picture_url TEXT NOT NULL DEFAULT '';`); err != nil {
-			return fmt.Errorf("add contacts.profile_picture_url column: %w", err)
+	if _, ok := columnTypes["profile_picture_path"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE contacts ADD COLUMN profile_picture_path TEXT;`); err != nil {
+			return fmt.Errorf("add contacts.profile_picture_path column: %w", err)
+		}
+	}
+
+	columnTypes, err = tableColumnTypes(ctx, conn, "contacts")
+	if err != nil {
+		return err
+	}
+
+	if _, ok := columnTypes["name"]; ok {
+		if _, err := conn.ExecContext(ctx, `
+UPDATE contacts
+SET display_name = name
+WHERE COALESCE(display_name, '') = '';
+`); err != nil {
+			return fmt.Errorf("backfill contacts.display_name: %w", err)
+		}
+	}
+
+	if _, ok := columnTypes["username"]; ok {
+		if _, err := conn.ExecContext(ctx, `
+UPDATE contacts
+SET local_handle = username
+WHERE COALESCE(local_handle, '') = '';
+`); err != nil {
+			return fmt.Errorf("backfill contacts.local_handle: %w", err)
+		}
+	}
+
+	if _, ok := columnTypes["profile_picture_url"]; ok {
+		if _, err := conn.ExecContext(ctx, `
+UPDATE contacts
+SET profile_picture_path = profile_picture_url
+WHERE COALESCE(profile_picture_path, '') = '';
+`); err != nil {
+			return fmt.Errorf("backfill contacts.profile_picture_path: %w", err)
 		}
 	}
 
@@ -351,15 +479,74 @@ func migrateContactRequestsTable(ctx context.Context, conn *sql.DB) error {
 		return err
 	}
 
-	if _, ok := columnTypes["name"]; !ok {
-		if _, err := conn.ExecContext(ctx, `ALTER TABLE contact_requests ADD COLUMN name TEXT NOT NULL DEFAULT '';`); err != nil {
-			return fmt.Errorf("add contact_requests.name column: %w", err)
+	if _, ok := columnTypes["from_device_id"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE contact_requests ADD COLUMN from_device_id TEXT;`); err != nil {
+			return fmt.Errorf("add contact_requests.from_device_id column: %w", err)
 		}
 	}
 
-	if _, ok := columnTypes["username"]; !ok {
-		if _, err := conn.ExecContext(ctx, `ALTER TABLE contact_requests ADD COLUMN username TEXT NOT NULL DEFAULT '';`); err != nil {
-			return fmt.Errorf("add contact_requests.username column: %w", err)
+	if _, ok := columnTypes["display_name"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE contact_requests ADD COLUMN display_name TEXT NOT NULL DEFAULT '';`); err != nil {
+			return fmt.Errorf("add contact_requests.display_name column: %w", err)
+		}
+	}
+
+	if _, ok := columnTypes["local_handle"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE contact_requests ADD COLUMN local_handle TEXT;`); err != nil {
+			return fmt.Errorf("add contact_requests.local_handle column: %w", err)
+		}
+	}
+
+	if _, ok := columnTypes["from_public_key"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE contact_requests ADD COLUMN from_public_key BLOB;`); err != nil {
+			return fmt.Errorf("add contact_requests.from_public_key column: %w", err)
+		}
+	}
+
+	if _, ok := columnTypes["invite_payload"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE contact_requests ADD COLUMN invite_payload TEXT NOT NULL DEFAULT '';`); err != nil {
+			return fmt.Errorf("add contact_requests.invite_payload column: %w", err)
+		}
+	}
+
+	if _, ok := columnTypes["state"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE contact_requests ADD COLUMN state TEXT NOT NULL DEFAULT 'pending';`); err != nil {
+			return fmt.Errorf("add contact_requests.state column: %w", err)
+		}
+	}
+
+	columnTypes, err = tableColumnTypes(ctx, conn, "contact_requests")
+	if err != nil {
+		return err
+	}
+
+	if _, ok := columnTypes["name"]; ok {
+		if _, err := conn.ExecContext(ctx, `
+UPDATE contact_requests
+SET display_name = name
+WHERE COALESCE(display_name, '') = '';
+`); err != nil {
+			return fmt.Errorf("backfill contact_requests.display_name: %w", err)
+		}
+	}
+
+	if _, ok := columnTypes["username"]; ok {
+		if _, err := conn.ExecContext(ctx, `
+UPDATE contact_requests
+SET local_handle = username
+WHERE COALESCE(local_handle, '') = '';
+`); err != nil {
+			return fmt.Errorf("backfill contact_requests.local_handle: %w", err)
+		}
+	}
+
+	if _, ok := columnTypes["from_contact_code"]; ok {
+		if _, err := conn.ExecContext(ctx, `
+UPDATE contact_requests
+SET invite_payload = COALESCE(from_contact_code, '')
+WHERE COALESCE(invite_payload, '') = '';
+`); err != nil {
+			return fmt.Errorf("backfill contact_requests.invite_payload: %w", err)
 		}
 	}
 
@@ -372,21 +559,18 @@ func messagesTableNeedsMigration(ctx context.Context, conn *sql.DB) (bool, error
 		return false, err
 	}
 
-	idType, ok := columnTypes["id"]
-	if !ok {
-		return true, nil
+	requiredColumns := []string{
+		"id",
+		"sender_user_id",
+		"client_message_id",
+		"received_at",
+		"direction",
+		"delivery_state",
 	}
-
-	if !strings.EqualFold(strings.TrimSpace(idType), "INTEGER") {
-		return true, nil
-	}
-
-	if _, ok := columnTypes["client_message_id"]; !ok {
-		return true, nil
-	}
-
-	if _, ok := columnTypes["delivery_state"]; !ok {
-		return true, nil
+	for _, column := range requiredColumns {
+		if _, ok := columnTypes[column]; !ok {
+			return true, nil
+		}
 	}
 
 	return false, nil
@@ -413,22 +597,22 @@ func migrateLegacyContactsTable(ctx context.Context, conn *sql.DB) error {
 		}
 	}
 
-	nameExpr := "''"
+	displayNameExpr := "''"
 	if _, ok := legacyColumns["name"]; ok {
-		nameExpr = "name"
+		displayNameExpr = "name"
 	}
 
-	usernameExpr := "''"
+	localHandleExpr := "NULL"
 	if _, ok := legacyColumns["username"]; ok {
-		usernameExpr = "username"
+		localHandleExpr = "username"
 	}
 
-	profilePictureExpr := "''"
+	profilePictureExpr := "NULL"
 	if _, ok := legacyColumns["profile_picture_url"]; ok {
 		profilePictureExpr = "profile_picture_url"
 	}
 
-	contactCodeExpr := "''"
+	contactCodeExpr := "NULL"
 	if _, ok := legacyColumns["contact_code"]; ok {
 		contactCodeExpr = "contact_code"
 	} else if _, ok := legacyColumns["friend_code"]; ok {
@@ -437,28 +621,28 @@ func migrateLegacyContactsTable(ctx context.Context, conn *sql.DB) error {
 
 	copyQuery := fmt.Sprintf(`
 INSERT INTO contacts (
-  user_id,
-  name,
-  username,
-  profile_picture_url,
-  contact_code,
-  created_at
+	user_id,
+	display_name,
+	local_handle,
+	profile_picture_path,
+	contact_code,
+	created_at
 )
 SELECT
-  user_id,
-  %s,
-  %s,
-  %s,
-  %s,
-  created_at
+	user_id,
+	%s,
+	%s,
+	%s,
+	%s,
+	created_at
 FROM friends
 ON CONFLICT(user_id) DO UPDATE SET
-  name = excluded.name,
-  username = excluded.username,
-  profile_picture_url = excluded.profile_picture_url,
-  contact_code = excluded.contact_code,
-  created_at = excluded.created_at;
-`, nameExpr, usernameExpr, profilePictureExpr, contactCodeExpr)
+	display_name = excluded.display_name,
+	local_handle = excluded.local_handle,
+	profile_picture_path = excluded.profile_picture_path,
+	contact_code = excluded.contact_code,
+	created_at = excluded.created_at;
+`, displayNameExpr, localHandleExpr, profilePictureExpr, contactCodeExpr)
 
 	if _, err := tx.ExecContext(ctx, copyQuery); err != nil {
 		return fmt.Errorf("copy legacy contacts: %w", err)
@@ -496,17 +680,17 @@ func migrateLegacyContactRequestsTable(ctx context.Context, conn *sql.DB) error 
 		}
 	}
 
-	nameExpr := "''"
+	displayNameExpr := "''"
 	if _, ok := legacyColumns["name"]; ok {
-		nameExpr = "name"
+		displayNameExpr = "name"
 	}
 
-	usernameExpr := "''"
+	localHandleExpr := "NULL"
 	if _, ok := legacyColumns["username"]; ok {
-		usernameExpr = "username"
+		localHandleExpr = "username"
 	}
 
-	fromContactCodeExpr := "''"
+	fromContactCodeExpr := "NULL"
 	if _, ok := legacyColumns["from_contact_code"]; ok {
 		fromContactCodeExpr = "from_contact_code"
 	} else if _, ok := legacyColumns["from_friend_code"]; ok {
@@ -515,25 +699,31 @@ func migrateLegacyContactRequestsTable(ctx context.Context, conn *sql.DB) error 
 
 	copyQuery := fmt.Sprintf(`
 INSERT INTO contact_requests (
-  from_user_id,
-  name,
-  username,
-  from_contact_code,
-  created_at
+	from_user_id,
+	display_name,
+	local_handle,
+	from_contact_code,
+	invite_payload,
+	state,
+	created_at
 )
 SELECT
-  from_user_id,
-  %s,
-  %s,
-  %s,
-  created_at
+	from_user_id,
+	%s,
+	%s,
+	%s,
+	COALESCE(%s, ''),
+	'pending',
+	created_at
 FROM friend_requests
 ON CONFLICT(from_user_id) DO UPDATE SET
-  name = excluded.name,
-  username = excluded.username,
-  from_contact_code = excluded.from_contact_code,
-  created_at = excluded.created_at;
-`, nameExpr, usernameExpr, fromContactCodeExpr)
+	display_name = excluded.display_name,
+	local_handle = excluded.local_handle,
+	from_contact_code = excluded.from_contact_code,
+	invite_payload = excluded.invite_payload,
+	state = excluded.state,
+	created_at = excluded.created_at;
+`, displayNameExpr, localHandleExpr, fromContactCodeExpr, fromContactCodeExpr)
 
 	if _, err := tx.ExecContext(ctx, copyQuery); err != nil {
 		return fmt.Errorf("copy legacy contact requests: %w", err)
@@ -548,23 +738,6 @@ ON CONFLICT(from_user_id) DO UPDATE SET
 	}
 
 	return nil
-}
-
-func usersTableNeedsIDMigration(ctx context.Context, conn *sql.DB) (bool, error) {
-	columnTypes, err := tableColumnTypes(ctx, conn, "users")
-	if err != nil {
-		return false, err
-	}
-
-	if _, ok := columnTypes["id"]; !ok {
-		return true, nil
-	}
-
-	if _, ok := columnTypes["contact_code"]; !ok {
-		return true, nil
-	}
-
-	return false, nil
 }
 
 func tableExists(ctx context.Context, conn *sql.DB, tableName string) (bool, error) {

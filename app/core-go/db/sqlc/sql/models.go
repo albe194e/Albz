@@ -4,59 +4,90 @@
 
 package sql
 
+import (
+	"database/sql"
+)
+
+type Contact struct {
+	ID                 int64          `db:"id" json:"id"`
+	UserID             string         `db:"user_id" json:"user_id"`
+	DisplayName        string         `db:"display_name" json:"display_name"`
+	LocalHandle        sql.NullString `db:"local_handle" json:"local_handle"`
+	ProfilePicturePath sql.NullString `db:"profile_picture_path" json:"profile_picture_path"`
+	ContactCode        sql.NullString `db:"contact_code" json:"contact_code"`
+	CreatedAt          int64          `db:"created_at" json:"created_at"`
+}
+
+type ContactDevice struct {
+	ID            int64         `db:"id" json:"id"`
+	ContactUserID string        `db:"contact_user_id" json:"contact_user_id"`
+	DeviceID      string        `db:"device_id" json:"device_id"`
+	PublicKey     []byte        `db:"public_key" json:"public_key"`
+	CreatedAt     int64         `db:"created_at" json:"created_at"`
+	RevokedAt     sql.NullInt64 `db:"revoked_at" json:"revoked_at"`
+}
+
+type ContactRequest struct {
+	ID              int64          `db:"id" json:"id"`
+	FromUserID      string         `db:"from_user_id" json:"from_user_id"`
+	FromDeviceID    sql.NullString `db:"from_device_id" json:"from_device_id"`
+	DisplayName     string         `db:"display_name" json:"display_name"`
+	LocalHandle     sql.NullString `db:"local_handle" json:"local_handle"`
+	FromPublicKey   []byte         `db:"from_public_key" json:"from_public_key"`
+	FromContactCode sql.NullString `db:"from_contact_code" json:"from_contact_code"`
+	InvitePayload   string         `db:"invite_payload" json:"invite_payload"`
+	State           string         `db:"state" json:"state"`
+	CreatedAt       int64          `db:"created_at" json:"created_at"`
+}
+
 type Conversation struct {
-	ID   string `db:"id" json:"id"`
-	Name string `db:"name" json:"name"`
+	ID        string        `db:"id" json:"id"`
+	Name      string        `db:"name" json:"name"`
+	Type      string        `db:"type" json:"type"`
+	CreatedAt int64         `db:"created_at" json:"created_at"`
+	UpdatedAt sql.NullInt64 `db:"updated_at" json:"updated_at"`
 }
 
 type ConversationParticipant struct {
 	ID             int64  `db:"id" json:"id"`
 	ConversationID string `db:"conversation_id" json:"conversation_id"`
-	ParticipantID  string `db:"participant_id" json:"participant_id"`
+	UserID         string `db:"user_id" json:"user_id"`
+	CreatedAt      int64  `db:"created_at" json:"created_at"`
 }
 
-type Contact struct {
-	ID                int64  `db:"id" json:"id"`
-	UserID            string `db:"user_id" json:"user_id"`
-	Name              string `db:"name" json:"name"`
-	Username          string `db:"username" json:"username"`
-	ProfilePictureUrl string `db:"profile_picture_url" json:"profile_picture_url"`
-	ContactCode       string `db:"contact_code" json:"contact_code"`
-	CreatedAt         int64  `db:"created_at" json:"created_at"`
-}
-
-type ContactRequest struct {
-	ID              int64  `db:"id" json:"id"`
-	FromUserID      string `db:"from_user_id" json:"from_user_id"`
-	Name            string `db:"name" json:"name"`
-	Username        string `db:"username" json:"username"`
-	FromContactCode string `db:"from_contact_code" json:"from_contact_code"`
-	CreatedAt       int64  `db:"created_at" json:"created_at"`
+type LocalIdentity struct {
+	ID                        int64          `db:"id" json:"id"`
+	UserID                    string         `db:"user_id" json:"user_id"`
+	DeviceID                  string         `db:"device_id" json:"device_id"`
+	DevicePublicKey           []byte         `db:"device_public_key" json:"device_public_key"`
+	EncryptedDevicePrivateKey []byte         `db:"encrypted_device_private_key" json:"encrypted_device_private_key"`
+	KdfSalt                   []byte         `db:"kdf_salt" json:"kdf_salt"`
+	KdfParams                 string         `db:"kdf_params" json:"kdf_params"`
+	Name                      string         `db:"name" json:"name"`
+	LocalHandle               sql.NullString `db:"local_handle" json:"local_handle"`
+	ProfilePicturePath        sql.NullString `db:"profile_picture_path" json:"profile_picture_path"`
+	ContactCode               sql.NullString `db:"contact_code" json:"contact_code"`
+	CreatedAt                 int64          `db:"created_at" json:"created_at"`
 }
 
 type Message struct {
-	ID              int64  `db:"id" json:"id"`
-	ConversationID  string `db:"conversation_id" json:"conversation_id"`
-	SenderID        string `db:"sender_id" json:"sender_id"`
-	ClientMessageID string `db:"client_message_id" json:"client_message_id"`
-	Body            string `db:"body" json:"body"`
-	CreatedAt       int64  `db:"created_at" json:"created_at"`
-	DeliveryState   string `db:"delivery_state" json:"delivery_state"`
+	ID              string         `db:"id" json:"id"`
+	ConversationID  string         `db:"conversation_id" json:"conversation_id"`
+	SenderUserID    string         `db:"sender_user_id" json:"sender_user_id"`
+	SenderDeviceID  sql.NullString `db:"sender_device_id" json:"sender_device_id"`
+	ClientMessageID string         `db:"client_message_id" json:"client_message_id"`
+	Body            string         `db:"body" json:"body"`
+	CreatedAt       int64          `db:"created_at" json:"created_at"`
+	ReceivedAt      sql.NullInt64  `db:"received_at" json:"received_at"`
+	Direction       string         `db:"direction" json:"direction"`
+	DeliveryState   string         `db:"delivery_state" json:"delivery_state"`
 }
 
 type Session struct {
 	ID        int64  `db:"id" json:"id"`
 	SessionID string `db:"session_id" json:"session_id"`
 	UserID    string `db:"user_id" json:"user_id"`
+	DeviceID  string `db:"device_id" json:"device_id"`
 	CreatedAt int64  `db:"created_at" json:"created_at"`
 	ExpiresAt int64  `db:"expires_at" json:"expires_at"`
-}
-
-type User struct {
-	ID                string `db:"id" json:"id"`
-	Name              string `db:"name" json:"name"`
-	Username          string `db:"username" json:"username"`
-	HashedPassword    string `db:"hashed_password" json:"hashed_password"`
-	ProfilePictureUrl string `db:"profile_picture_url" json:"profile_picture_url"`
-	ContactCode       string `db:"contact_code" json:"contact_code"`
 }

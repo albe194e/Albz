@@ -3,8 +3,9 @@ param(
     [string]$WorkspaceRoot
 )
 
-$Host.UI.RawUI.WindowTitle = "Albz Dev Server"
+$Host.UI.RawUI.WindowTitle = "Haddle Dev Server"
 
 Set-Location $WorkspaceRoot
+$env:HADDLE_DEV_MODE = "1"
 
 go run ./server

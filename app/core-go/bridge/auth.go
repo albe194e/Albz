@@ -11,7 +11,7 @@ func (b *Bridge) TryLoadSession() (bool, error) {
 	}
 
 	loaded, err := b.service.TryLoadSession(context.Background())
-	if err == nil && !loaded {
+	if err == nil {
 		b.emitStateChanged()
 	}
 

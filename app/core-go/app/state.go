@@ -9,7 +9,7 @@ import (
 )
 
 type AppState struct {
-	CurrentUser          *sql.User
+	CurrentUser          *sql.LocalIdentity
 	Messages             []sql.Message
 	Conversations        []sql.Conversation
 	Contacts             []sql.Contact
@@ -24,7 +24,7 @@ func (s *AppState) InitStateFromDB(ctx context.Context, store *storage.Store) er
 		return fmt.Errorf("CurrentUser is nil")
 	}
 
-	convs, err := store.Q.GetConversationsByUserID(ctx, s.CurrentUser.ID)
+	convs, err := store.Q.GetConversationsByUserID(ctx, s.CurrentUser.UserID)
 	if err != nil {
 		return err
 	}

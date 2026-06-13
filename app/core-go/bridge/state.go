@@ -1,11 +1,12 @@
 package bridge
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 
 	clientapp "github.com/albe194e/albz/app/core-go/app"
-	"github.com/albe194e/albz/app/core-go/db/sqlc/sql"
+	dbsql "github.com/albe194e/albz/app/core-go/db/sqlc/sql"
 )
 
 func (b *Bridge) SetEventSink(sink EventSink) error {
@@ -99,12 +100,20 @@ func snapshotFromState(state *clientapp.AppState) Snapshot {
 	}
 
 	if state.CurrentUser != nil {
+		localHandle := nullableStringValue(state.CurrentUser.LocalHandle)
+		profilePicturePath := nullableStringValue(state.CurrentUser.ProfilePicturePath)
+		contactCode := nullableStringValue(state.CurrentUser.ContactCode)
+
 		snapshot.CurrentUser = &User{
-			ID:                state.CurrentUser.ID,
-			Name:              state.CurrentUser.Name,
-			Username:          state.CurrentUser.Username,
-			ProfilePictureUrl: state.CurrentUser.ProfilePictureUrl,
-			ContactCode:       state.CurrentUser.ContactCode,
+			ID:                 state.CurrentUser.UserID,
+			UserID:             state.CurrentUser.UserID,
+			DeviceID:           state.CurrentUser.DeviceID,
+			Name:               state.CurrentUser.Name,
+			LocalHandle:        localHandle,
+			Username:           localHandle,
+			ProfilePicturePath: profilePicturePath,
+			ProfilePictureUrl:  profilePicturePath,
+			ContactCode:        contactCode,
 		}
 	}
 
@@ -112,18 +121,25 @@ func snapshotFromState(state *clientapp.AppState) Snapshot {
 		snapshot.Messages = append(snapshot.Messages, Message{
 			ID:              message.ID,
 			ConversationID:  message.ConversationID,
-			SenderID:        message.SenderID,
+			SenderUserID:    message.SenderUserID,
+			SenderID:        message.SenderUserID,
+			SenderDeviceID:  nullableStringValue(message.SenderDeviceID),
 			ClientMessageID: message.ClientMessageID,
 			Body:            message.Body,
 			CreatedAt:       message.CreatedAt,
+			ReceivedAt:      nullableInt64Value(message.ReceivedAt),
+			Direction:       message.Direction,
 			DeliveryState:   message.DeliveryState,
 		})
 	}
 
 	for _, conversation := range state.Conversations {
 		snapshot.Conversations = append(snapshot.Conversations, Conversation{
-			ID:   conversation.ID,
-			Name: conversation.Name,
+			ID:        conversation.ID,
+			Name:      conversation.Name,
+			Type:      conversation.Type,
+			CreatedAt: conversation.CreatedAt,
+			UpdatedAt: nullableInt64Value(conversation.UpdatedAt),
 		})
 	}
 
@@ -132,12 +148,20 @@ func snapshotFromState(state *clientapp.AppState) Snapshot {
 	}
 
 	for _, request := range state.ContactRequests {
+		localHandle := nullableStringValue(request.LocalHandle)
+		fromContactCode := nullableStringValue(request.FromContactCode)
+
 		snapshot.ContactRequests = append(snapshot.ContactRequests, ContactRequest{
 			ID:              request.ID,
 			FromUserID:      request.FromUserID,
-			Name:            request.Name,
-			Username:        request.Username,
-			FromContactCode: request.FromContactCode,
+			FromDeviceID:    nullableStringValue(request.FromDeviceID),
+			DisplayName:     request.DisplayName,
+			Name:            request.DisplayName,
+			LocalHandle:     localHandle,
+			Username:        localHandle,
+			FromContactCode: fromContactCode,
+			InvitePayload:   request.InvitePayload,
+			State:           request.State,
 			CreatedAt:       request.CreatedAt,
 		})
 	}
@@ -145,14 +169,37 @@ func snapshotFromState(state *clientapp.AppState) Snapshot {
 	return snapshot
 }
 
-func mapContact(contact sql.Contact) Contact {
+func mapContact(contact dbsql.Contact) Contact {
+	localHandle := nullableStringValue(contact.LocalHandle)
+	profilePicturePath := nullableStringValue(contact.ProfilePicturePath)
+	contactCode := nullableStringValue(contact.ContactCode)
+
 	return Contact{
-		ID:                contact.ID,
-		UserID:            contact.UserID,
-		Name:              contact.Name,
-		Username:          contact.Username,
-		ProfilePictureUrl: contact.ProfilePictureUrl,
-		ContactCode:       contact.ContactCode,
-		CreatedAt:         contact.CreatedAt,
+		ID:                 contact.ID,
+		UserID:             contact.UserID,
+		DisplayName:        contact.DisplayName,
+		Name:               contact.DisplayName,
+		LocalHandle:        localHandle,
+		Username:           localHandle,
+		ProfilePicturePath: profilePicturePath,
+		ProfilePictureUrl:  profilePicturePath,
+		ContactCode:        contactCode,
+		CreatedAt:          contact.CreatedAt,
 	}
+}
+
+func nullableStringValue(value sql.NullString) string {
+	if !value.Valid {
+		return ""
+	}
+
+	return value.String
+}
+
+func nullableInt64Value(value sql.NullInt64) int64 {
+	if !value.Valid {
+		return 0
+	}
+
+	return value.Int64
 }

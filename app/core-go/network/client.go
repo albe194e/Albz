@@ -1,7 +1,11 @@
 package network
 
 import (
+	"crypto/ecdh"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -10,6 +14,8 @@ import (
 	"github.com/albe194e/albz/shared/protocol"
 	"github.com/gorilla/websocket"
 )
+
+const authProofContext = "haddle-relay-auth-v1"
 
 type Handlers struct {
 	OnConversationCreated    func(protocol.Envelope[protocol.ConversationCreatedPayload])
@@ -29,6 +35,7 @@ type Client struct {
 	mu          sync.RWMutex
 	conn        *websocket.Conn
 	userID      string
+	deviceID    string
 	contactCode string
 	writeMu     sync.Mutex
 }
@@ -48,16 +55,25 @@ func NewClient(serverURL string, handlers Handlers) *Client {
 	}
 }
 
-func (c *Client) Connect(userID string, contactCode string) error {
+func (c *Client) Connect(userID, deviceID, contactCode string, devicePublicKey, devicePrivateKey []byte) error {
 	if strings.TrimSpace(userID) == "" {
 		return fmt.Errorf("user ID is required")
+	}
+	if strings.TrimSpace(deviceID) == "" {
+		return fmt.Errorf("device ID is required")
 	}
 	if strings.TrimSpace(contactCode) == "" {
 		return fmt.Errorf("contact code is required")
 	}
+	if len(devicePublicKey) == 0 {
+		return fmt.Errorf("device public key is required")
+	}
+	if len(devicePrivateKey) == 0 {
+		return fmt.Errorf("device private key is required")
+	}
 
 	c.mu.RLock()
-	if c.conn != nil && c.userID == userID && c.contactCode == contactCode {
+	if c.conn != nil && c.userID == userID && c.deviceID == deviceID && c.contactCode == contactCode {
 		c.mu.RUnlock()
 		return nil
 	}
@@ -68,22 +84,22 @@ func (c *Client) Connect(userID string, contactCode string) error {
 		return fmt.Errorf("parse server URL: %w", err)
 	}
 
-	query := wsURL.Query()
-	query.Set("user_id", userID)
-	query.Set("contact_code", contactCode)
-	wsURL.RawQuery = query.Encode()
-
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL.String(), nil)
 	if err != nil {
 		return fmt.Errorf("dial websocket: %w", err)
 	}
 
-	var previous *websocket.Conn
+	if err := c.authenticateConnection(conn, userID, deviceID, contactCode, devicePublicKey, devicePrivateKey); err != nil {
+		_ = conn.Close()
+		return err
+	}
 
+	var previous *websocket.Conn
 	c.mu.Lock()
 	previous = c.conn
 	c.conn = conn
 	c.userID = userID
+	c.deviceID = deviceID
 	c.contactCode = contactCode
 	c.mu.Unlock()
 
@@ -95,11 +111,155 @@ func (c *Client) Connect(userID string, contactCode string) error {
 	return nil
 }
 
+func (c *Client) authenticateConnection(conn *websocket.Conn, userID, deviceID, contactCode string, devicePublicKey, devicePrivateKey []byte) error {
+	if err := conn.WriteJSON(protocol.Envelope[protocol.DeviceRegisterPayload]{
+		Type: protocol.EventDeviceRegister,
+		Payload: protocol.DeviceRegisterPayload{
+			UserID:          userID,
+			DeviceID:        deviceID,
+			DevicePublicKey: append([]byte(nil), devicePublicKey...),
+			ContactCode:     contactCode,
+		},
+	}); err != nil {
+		return fmt.Errorf("send device registration: %w", err)
+	}
+
+	_, data, err := conn.ReadMessage()
+	if err != nil {
+		return fmt.Errorf("read auth challenge: %w", err)
+	}
+
+	envelope, err := decodeRawEnvelope(data)
+	if err != nil {
+		return err
+	}
+
+	switch envelope.Type {
+	case protocol.EventAuthChallenge:
+		var payload protocol.AuthChallengePayload
+		if err := json.Unmarshal(envelope.Payload, &payload); err != nil {
+			return fmt.Errorf("decode auth challenge payload: %w", err)
+		}
+
+		proof, err := computeAuthProof(devicePrivateKey, payload.ServerPublicKey, payload.Nonce, userID, deviceID, contactCode)
+		if err != nil {
+			return err
+		}
+
+		if err := conn.WriteJSON(protocol.Envelope[protocol.AuthRespondPayload]{
+			Type: protocol.EventAuthRespond,
+			Payload: protocol.AuthRespondPayload{
+				UserID:   userID,
+				DeviceID: deviceID,
+				Proof:    proof,
+			},
+		}); err != nil {
+			return fmt.Errorf("send auth response: %w", err)
+		}
+	case protocol.EventAuthFailure:
+		return decodeAuthFailure(envelope)
+	case protocol.EventError:
+		return decodeErrorPayload(envelope)
+	default:
+		return fmt.Errorf("unexpected handshake event %q", envelope.Type)
+	}
+
+	_, data, err = conn.ReadMessage()
+	if err != nil {
+		return fmt.Errorf("read auth success: %w", err)
+	}
+
+	envelope, err = decodeRawEnvelope(data)
+	if err != nil {
+		return err
+	}
+
+	switch envelope.Type {
+	case protocol.EventAuthSuccess:
+		var payload protocol.AuthSuccessPayload
+		if err := json.Unmarshal(envelope.Payload, &payload); err != nil {
+			return fmt.Errorf("decode auth success payload: %w", err)
+		}
+		if payload.UserID != userID || payload.DeviceID != deviceID {
+			return fmt.Errorf("auth success did not match expected device")
+		}
+		return nil
+	case protocol.EventAuthFailure:
+		return decodeAuthFailure(envelope)
+	case protocol.EventError:
+		return decodeErrorPayload(envelope)
+	default:
+		return fmt.Errorf("unexpected post-auth event %q", envelope.Type)
+	}
+}
+
+func decodeRawEnvelope(data []byte) (rawEnvelope, error) {
+	var envelope rawEnvelope
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		return rawEnvelope{}, fmt.Errorf("decode envelope: %w", err)
+	}
+
+	return envelope, nil
+}
+
+func decodeErrorPayload(envelope rawEnvelope) error {
+	var payload protocol.ErrorPayload
+	if err := json.Unmarshal(envelope.Payload, &payload); err != nil {
+		return fmt.Errorf("decode error payload: %w", err)
+	}
+
+	return errors.New(payload.Message)
+}
+
+func decodeAuthFailure(envelope rawEnvelope) error {
+	var payload protocol.AuthFailurePayload
+	if err := json.Unmarshal(envelope.Payload, &payload); err != nil {
+		return fmt.Errorf("decode auth failure payload: %w", err)
+	}
+
+	if strings.TrimSpace(payload.Message) == "" {
+		return fmt.Errorf("relay authentication failed")
+	}
+
+	return errors.New(payload.Message)
+}
+
+func computeAuthProof(devicePrivateKeyBytes, serverPublicKeyBytes, nonce []byte, userID, deviceID, contactCode string) ([]byte, error) {
+	privateKey, err := ecdh.X25519().NewPrivateKey(devicePrivateKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("load device private key: %w", err)
+	}
+
+	serverPublicKey, err := ecdh.X25519().NewPublicKey(serverPublicKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("load server public key: %w", err)
+	}
+
+	sharedSecret, err := privateKey.ECDH(serverPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("derive relay auth secret: %w", err)
+	}
+
+	mac := hmac.New(sha256.New, sharedSecret)
+	_, _ = mac.Write([]byte(authProofContext))
+	_, _ = mac.Write([]byte{0})
+	_, _ = mac.Write([]byte(userID))
+	_, _ = mac.Write([]byte{0})
+	_, _ = mac.Write([]byte(deviceID))
+	_, _ = mac.Write([]byte{0})
+	_, _ = mac.Write([]byte(contactCode))
+	_, _ = mac.Write([]byte{0})
+	_, _ = mac.Write(nonce)
+
+	return mac.Sum(nil), nil
+}
+
 func (c *Client) Close() error {
 	c.mu.Lock()
 	conn := c.conn
 	c.conn = nil
 	c.userID = ""
+	c.deviceID = ""
 	c.contactCode = ""
 	c.mu.Unlock()
 
@@ -273,6 +433,7 @@ func (c *Client) clearConnection(conn *websocket.Conn) {
 	if c.conn == conn {
 		c.conn = nil
 		c.userID = ""
+		c.deviceID = ""
 		c.contactCode = ""
 	}
 }

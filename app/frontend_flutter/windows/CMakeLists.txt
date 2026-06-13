@@ -87,7 +87,7 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     COMPONENT Runtime)
 endif()
 
-set(CORE_GO_WINDOWS_DLL "${CMAKE_CURRENT_SOURCE_DIR}/../native/windows/albz_core.dll")
+set(CORE_GO_WINDOWS_DLL "${CMAKE_CURRENT_SOURCE_DIR}/../native/windows/haddle_core.dll")
 if(EXISTS "${CORE_GO_WINDOWS_DLL}")
   install(FILES "${CORE_GO_WINDOWS_DLL}"
     DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"

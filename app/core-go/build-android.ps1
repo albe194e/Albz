@@ -121,7 +121,7 @@ Invoke-AndroidBuild `
     -GoArch "arm64" `
     -Abi "arm64-v8a" `
     -ClangName "aarch64-linux-android21-clang.cmd" `
-    -OutputPath (Join-Path $jniLibsRoot "arm64-v8a\libalbz_core.so")
+    -OutputPath (Join-Path $jniLibsRoot "arm64-v8a\libhaddle_core.so")
 
 Invoke-AndroidBuild `
     -GoExe $goExe `
@@ -129,4 +129,4 @@ Invoke-AndroidBuild `
     -GoArch "amd64" `
     -Abi "x86_64" `
     -ClangName "x86_64-linux-android21-clang.cmd" `
-    -OutputPath (Join-Path $jniLibsRoot "x86_64\libalbz_core.so")
+    -OutputPath (Join-Path $jniLibsRoot "x86_64\libhaddle_core.so")

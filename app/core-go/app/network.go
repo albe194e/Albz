@@ -5,6 +5,7 @@ import (
 	dsql "database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/albe194e/albz/app/core-go/db/sqlc/sql"
 	"github.com/albe194e/albz/shared/protocol"
@@ -14,8 +15,17 @@ func (c *Controller) ConnectToServer(ctx context.Context) error {
 	if c == nil || c.Net == nil || c.State == nil || c.State.CurrentUser == nil {
 		return nil
 	}
+	if len(c.UnlockedDevicePrivateKey) == 0 {
+		return fmt.Errorf("device key is locked; login is required before connecting to the relay")
+	}
 
-	if err := c.Net.Connect(c.State.CurrentUser.ID, c.State.CurrentUser.ContactCode); err != nil {
+	if err := c.Net.Connect(
+		c.State.CurrentUser.UserID,
+		c.State.CurrentUser.DeviceID,
+		nullStringValue(c.State.CurrentUser.ContactCode),
+		c.State.CurrentUser.DevicePublicKey,
+		c.UnlockedDevicePrivateKey,
+	); err != nil {
 		c.State.ServerConnected = false
 		c.State.LastNetworkError = err.Error()
 		c.notifyStateChanged()
@@ -42,7 +52,7 @@ func (c *Controller) HandleIncomingMessage(event protocol.Envelope[protocol.Mess
 
 		participantUserIDs := event.Payload.ParticipantUserIDs
 		if len(participantUserIDs) == 0 {
-			participantUserIDs = []string{c.State.CurrentUser.ID, event.Payload.FromUserID}
+			participantUserIDs = []string{c.State.CurrentUser.UserID, event.Payload.FromUserID}
 		}
 
 		conversationName := c.conversationDisplayName("", participantUserIDs)
@@ -60,12 +70,19 @@ func (c *Controller) HandleIncomingMessage(event protocol.Envelope[protocol.Mess
 	}
 
 	err := c.Store.Q.CreateMessage(context.Background(), sql.CreateMessageParams{
+		ID:              event.Payload.MessageID,
 		ConversationID:  event.Payload.ConversationID,
-		SenderID:        event.Payload.FromUserID,
+		SenderUserID:    event.Payload.FromUserID,
+		SenderDeviceID:  nullString(strings.TrimSpace(event.Payload.FromDeviceID)),
 		ClientMessageID: event.Payload.MessageID,
 		Body:            event.Payload.Body,
 		CreatedAt:       event.Payload.SentAt,
-		DeliveryState:   string(protocol.DeliveryStatusDelivered),
+		ReceivedAt: dsql.NullInt64{
+			Int64: event.Timestamp,
+			Valid: event.Timestamp > 0,
+		},
+		Direction:     MessageDirectionIncoming,
+		DeliveryState: string(protocol.DeliveryStatusDelivered),
 	})
 	if err != nil {
 		c.State.LastNetworkError = fmt.Sprintf("store incoming message: %v", err)
@@ -111,11 +128,16 @@ func (c *Controller) HandleContactRequestReceived(event protocol.Envelope[protoc
 		return
 	}
 
+	contactCode := strings.TrimSpace(event.Payload.FromProfile.ContactCode)
 	err := c.Store.Q.UpsertContactRequest(context.Background(), sql.UpsertContactRequestParams{
 		FromUserID:      event.Payload.FromProfile.UserID,
-		Name:            event.Payload.FromProfile.Name,
-		Username:        event.Payload.FromProfile.Username,
-		FromContactCode: event.Payload.FromProfile.ContactCode,
+		FromDeviceID:    nullString(strings.TrimSpace(event.Payload.FromProfile.DeviceID)),
+		DisplayName:     event.Payload.FromProfile.Name,
+		LocalHandle:     nullString(strings.TrimSpace(event.Payload.FromProfile.Username)),
+		FromPublicKey:   append([]byte(nil), event.Payload.FromProfile.DevicePublicKey...),
+		FromContactCode: nullString(contactCode),
+		InvitePayload:   contactCode,
+		State:           "pending",
 		CreatedAt:       event.Timestamp,
 	})
 	if err != nil {
@@ -152,24 +174,24 @@ func (c *Controller) HandleContactRequestAccepted(event protocol.Envelope[protoc
 		}
 		if request != nil {
 			if profile.Name == "" {
-				profile.Name = request.Name
+				profile.Name = request.DisplayName
 			}
 			if profile.Username == "" {
-				profile.Username = request.Username
+				profile.Username = nullStringValue(request.LocalHandle)
 			}
 			if profile.ContactCode == "" {
-				profile.ContactCode = request.FromContactCode
+				profile.ContactCode = nullStringValue(request.FromContactCode)
 			}
 		}
 	}
 
 	if err := c.Store.Q.UpsertContact(context.Background(), sql.UpsertContactParams{
-		UserID:            profile.UserID,
-		Name:              profile.Name,
-		Username:          profile.Username,
-		ProfilePictureUrl: "",
-		ContactCode:       profile.ContactCode,
-		CreatedAt:         event.Timestamp,
+		UserID:             profile.UserID,
+		DisplayName:        profile.Name,
+		LocalHandle:        nullString(strings.TrimSpace(profile.Username)),
+		ProfilePicturePath: dsql.NullString{},
+		ContactCode:        nullString(strings.TrimSpace(profile.ContactCode)),
+		CreatedAt:          event.Timestamp,
 	}); err != nil {
 		c.State.LastNetworkError = fmt.Sprintf("store contact: %v", err)
 		c.notifyStateChanged()
@@ -177,6 +199,7 @@ func (c *Controller) HandleContactRequestAccepted(event protocol.Envelope[protoc
 	}
 
 	_ = c.Store.Q.DeleteContactRequestByFromUserID(context.Background(), profile.UserID)
+	_ = c.upsertContactDeviceFromProfile(context.Background(), profile, event.Timestamp)
 
 	if err := c.LoadSocialState(context.Background()); err != nil {
 		c.State.LastNetworkError = fmt.Sprintf("reload social state: %v", err)
@@ -242,4 +265,21 @@ func (c *Controller) findContactRequestByUserID(userID string) (*sql.ContactRequ
 	}
 
 	return nil, nil
+}
+
+func (c *Controller) upsertContactDeviceFromProfile(ctx context.Context, profile protocol.PublicContactProfile, createdAt int64) error {
+	if c == nil || c.Store == nil {
+		return nil
+	}
+	if strings.TrimSpace(profile.UserID) == "" || strings.TrimSpace(profile.DeviceID) == "" || len(profile.DevicePublicKey) == 0 {
+		return nil
+	}
+
+	return c.Store.Q.UpsertContactDevice(ctx, sql.UpsertContactDeviceParams{
+		ContactUserID: profile.UserID,
+		DeviceID:      profile.DeviceID,
+		PublicKey:     append([]byte(nil), profile.DevicePublicKey...),
+		CreatedAt:     createdAt,
+		RevokedAt:     dsql.NullInt64{},
+	})
 }

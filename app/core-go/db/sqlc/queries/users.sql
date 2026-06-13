@@ -1,4 +1,4 @@
--- name: GetUserByID :one
+-- name: GetLocalIdentityByUserID :one
 SELECT *
-FROM users
-WHERE id = ?;
+FROM local_identity
+WHERE user_id = ?;

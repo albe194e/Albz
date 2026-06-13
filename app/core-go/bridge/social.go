@@ -13,3 +13,7 @@ func (b *Bridge) AcceptContactRequest(fromUserID string) error {
 func (b *Bridge) RejectContactRequest(fromUserID string) error {
 	return b.controller().RejectContactRequest(context.Background(), fromUserID)
 }
+
+func (b *Bridge) GetContactQRCode() ([]byte, error) {
+	return b.controller().GetContactQRCode()
+}

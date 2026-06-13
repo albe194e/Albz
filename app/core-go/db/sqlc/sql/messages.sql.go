@@ -7,67 +7,83 @@ package sql
 
 import (
 	"context"
+	"database/sql"
 )
 
 const createMessage = `-- name: CreateMessage :exec
 INSERT INTO messages (
-  conversation_id,
-  sender_id,
-  client_message_id,
-  body,
-  created_at,
-  delivery_state
+	id,
+	conversation_id,
+	sender_user_id,
+	sender_device_id,
+	client_message_id,
+	body,
+	created_at,
+	received_at,
+	direction,
+	delivery_state
 ) VALUES (
-  ?, ?, ?, ?, ?, ?
+	?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 )
 `
 
 type CreateMessageParams struct {
-	ConversationID  string `db:"conversation_id" json:"conversation_id"`
-	SenderID        string `db:"sender_id" json:"sender_id"`
-	ClientMessageID string `db:"client_message_id" json:"client_message_id"`
-	Body            string `db:"body" json:"body"`
-	CreatedAt       int64  `db:"created_at" json:"created_at"`
-	DeliveryState   string `db:"delivery_state" json:"delivery_state"`
+	ID              string         `db:"id" json:"id"`
+	ConversationID  string         `db:"conversation_id" json:"conversation_id"`
+	SenderUserID    string         `db:"sender_user_id" json:"sender_user_id"`
+	SenderDeviceID  sql.NullString `db:"sender_device_id" json:"sender_device_id"`
+	ClientMessageID string         `db:"client_message_id" json:"client_message_id"`
+	Body            string         `db:"body" json:"body"`
+	CreatedAt       int64          `db:"created_at" json:"created_at"`
+	ReceivedAt      sql.NullInt64  `db:"received_at" json:"received_at"`
+	Direction       string         `db:"direction" json:"direction"`
+	DeliveryState   string         `db:"delivery_state" json:"delivery_state"`
 }
 
 func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) error {
 	_, err := q.db.ExecContext(ctx, createMessage,
+		arg.ID,
 		arg.ConversationID,
-		arg.SenderID,
+		arg.SenderUserID,
+		arg.SenderDeviceID,
 		arg.ClientMessageID,
 		arg.Body,
 		arg.CreatedAt,
+		arg.ReceivedAt,
+		arg.Direction,
 		arg.DeliveryState,
 	)
 	return err
 }
 
 const getMessage = `-- name: GetMessage :one
-SELECT id, conversation_id, sender_id, client_message_id, body, created_at, delivery_state
+SELECT id, conversation_id, sender_user_id, sender_device_id, client_message_id, body, created_at, received_at, direction, delivery_state
 FROM messages
 WHERE id = ?
 `
 
-func (q *Queries) GetMessage(ctx context.Context, id int64) (Message, error) {
+func (q *Queries) GetMessage(ctx context.Context, id string) (Message, error) {
 	row := q.db.QueryRowContext(ctx, getMessage, id)
 	var i Message
 	err := row.Scan(
 		&i.ID,
 		&i.ConversationID,
-		&i.SenderID,
+		&i.SenderUserID,
+		&i.SenderDeviceID,
 		&i.ClientMessageID,
 		&i.Body,
 		&i.CreatedAt,
+		&i.ReceivedAt,
+		&i.Direction,
 		&i.DeliveryState,
 	)
 	return i, err
 }
 
 const getMessages = `-- name: GetMessages :many
-SELECT id, conversation_id, sender_id, client_message_id, body, created_at, delivery_state
+SELECT id, conversation_id, sender_user_id, sender_device_id, client_message_id, body, created_at, received_at, direction, delivery_state
 FROM messages
-ORDER BY created_at ASC
+ORDER BY created_at ASC, id ASC
 `
 
 func (q *Queries) GetMessages(ctx context.Context) ([]Message, error) {
@@ -82,10 +98,13 @@ func (q *Queries) GetMessages(ctx context.Context) ([]Message, error) {
 		if err := rows.Scan(
 			&i.ID,
 			&i.ConversationID,
-			&i.SenderID,
+			&i.SenderUserID,
+			&i.SenderDeviceID,
 			&i.ClientMessageID,
 			&i.Body,
 			&i.CreatedAt,
+			&i.ReceivedAt,
+			&i.Direction,
 			&i.DeliveryState,
 		); err != nil {
 			return nil, err
@@ -102,10 +121,10 @@ func (q *Queries) GetMessages(ctx context.Context) ([]Message, error) {
 }
 
 const listMessagesByConversation = `-- name: ListMessagesByConversation :many
-SELECT id, conversation_id, sender_id, client_message_id, body, created_at, delivery_state
+SELECT id, conversation_id, sender_user_id, sender_device_id, client_message_id, body, created_at, received_at, direction, delivery_state
 FROM messages
 WHERE conversation_id = ?
-ORDER BY created_at ASC
+ORDER BY created_at ASC, id ASC
 `
 
 func (q *Queries) ListMessagesByConversation(ctx context.Context, conversationID string) ([]Message, error) {
@@ -120,10 +139,13 @@ func (q *Queries) ListMessagesByConversation(ctx context.Context, conversationID
 		if err := rows.Scan(
 			&i.ID,
 			&i.ConversationID,
-			&i.SenderID,
+			&i.SenderUserID,
+			&i.SenderDeviceID,
 			&i.ClientMessageID,
 			&i.Body,
 			&i.CreatedAt,
+			&i.ReceivedAt,
+			&i.Direction,
 			&i.DeliveryState,
 		); err != nil {
 			return nil, err
