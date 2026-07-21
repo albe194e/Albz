@@ -25,9 +25,18 @@ Current status:
    - `cd app/frontend_flutter`
    - `flutter run -d windows`
 
+For reusable Windows multi-client launches:
+
+1. Build the debug desktop executable once:
+   - `make build-client-windows-debug`
+2. Launch one or more client profiles:
+   - `make run-client-alice`
+   - `make run-client-bob`
+
 Root shortcuts:
 
 - `make run-client`
+- `make build-client-windows-debug`
 - `make run-client-android`
 - `make run-client-profile PROFILE=alice`
 - `make run-client-alice`
@@ -41,7 +50,7 @@ Android shortcut:
 - `make run-client-android`
 - if more than one Android target is connected: `make run-client-android DEVICE=<flutter-device-id>`
 
-The named-profile shortcuts use `--dart-define=HADDLE_PROFILE=<name>` so the Flutter app initializes `core-go` with separate local profile roots.
+`make run-client` remains the hot-reload `flutter run` path. The named-profile Windows shortcuts now launch the built desktop executable with `HADDLE_PROFILE=<name>` in the process environment so multiple Windows clients can run at the same time without colliding in the Flutter build/install directory.
 
 The multi-window shortcuts (`make run-clients`, `make run-dev`, `make stop-dev`) are backed by PowerShell helper scripts in `scripts/` so Windows path quoting does not break the spawned Flutter terminals.
 

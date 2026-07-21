@@ -4,18 +4,20 @@ INSERT INTO contact_requests (
 	from_device_id,
 	display_name,
 	local_handle,
+	profile_picture_path,
 	from_public_key,
 	from_contact_code,
 	invite_payload,
 	state,
 	created_at
 ) VALUES (
-	?, ?, ?, ?, ?, ?, ?, ?, ?
+	?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 )
 ON CONFLICT(from_user_id) DO UPDATE SET
 	from_device_id = excluded.from_device_id,
 	display_name = excluded.display_name,
 	local_handle = excluded.local_handle,
+	profile_picture_path = excluded.profile_picture_path,
 	from_public_key = excluded.from_public_key,
 	from_contact_code = excluded.from_contact_code,
 	invite_payload = excluded.invite_payload,

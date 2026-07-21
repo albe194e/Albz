@@ -83,15 +83,16 @@ type Contact struct {
 }
 
 type ContactRequest struct {
-	ID              int64  `json:"id"`
-	FromUserID      string `json:"from_user_id"`
-	FromDeviceID    string `json:"from_device_id"`
-	DisplayName     string `json:"display_name"`
-	Name            string `json:"name"`
-	LocalHandle     string `json:"local_handle"`
-	Username        string `json:"username"`
-	FromContactCode string `json:"from_contact_code"`
-	InvitePayload   string `json:"invite_payload"`
-	State           string `json:"state"`
-	CreatedAt       int64  `json:"created_at"`
+	ID                 int64  `json:"id"`
+	FromUserID         string `json:"from_user_id"`
+	FromDeviceID       string `json:"from_device_id"`
+	DisplayName        string `json:"display_name"`
+	Name               string `json:"name"`
+	LocalHandle        string `json:"local_handle"`
+	Username           string `json:"username"`
+	ProfilePicturePath string `json:"profile_picture_path"`
+	FromContactCode    string `json:"from_contact_code"`
+	InvitePayload      string `json:"invite_payload"`
+	State              string `json:"state"`
+	CreatedAt          int64  `json:"created_at"`
 }

@@ -17,11 +17,23 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await DesktopWindow.configure();
 
-  const profileName = String.fromEnvironment('HADDLE_PROFILE');
-  const configuredDataDir = String.fromEnvironment('HADDLE_DATA_DIR');
-  const serverUrl = String.fromEnvironment(
+  const compileTimeProfileName = String.fromEnvironment('HADDLE_PROFILE');
+  const compileTimeDataDir = String.fromEnvironment('HADDLE_DATA_DIR');
+  const compileTimeServerUrl = String.fromEnvironment(
     'HADDLE_SERVER_WS_URL',
     defaultValue: 'wss://oncological-paroxysmal-karolyn.ngrok-free.dev/ws',
+  );
+  final profileName = _resolveDesktopConfigValue(
+    'HADDLE_PROFILE',
+    compileTimeProfileName,
+  );
+  final configuredDataDir = _resolveDesktopConfigValue(
+    'HADDLE_DATA_DIR',
+    compileTimeDataDir,
+  );
+  final serverUrl = _resolveDesktopConfigValue(
+    'HADDLE_SERVER_WS_URL',
+    compileTimeServerUrl,
   );
   final resolvedDataDir = configuredDataDir.isEmpty
       ? await _resolveDefaultDataDir()
@@ -41,6 +53,16 @@ Future<void> main() async {
       serverUrl: serverUrl,
     ),
   );
+}
+
+String _resolveDesktopConfigValue(String key, String compileTimeValue) {
+  if (compileTimeValue.isNotEmpty) {
+    return compileTimeValue;
+  }
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    return Platform.environment[key] ?? '';
+  }
+  return '';
 }
 
 Future<String?> _resolveDefaultDataDir() async {
@@ -107,44 +129,37 @@ class _HaddleAppState extends State<HaddleApp> {
           builder: (context, _) {
             return Scaffold(
               backgroundColor: AppColors.appBackground,
-              body: Column(
+              body: Stack(
                 children: [
-                  if (useDesktopWindowChrome) const DesktopTitleBar(),
-                  Expanded(
-                    child: SafeArea(
-                      top: !useDesktopWindowChrome,
-                      child: Column(
-                        children: [
-                          if (_controller.errorMessage.isNotEmpty)
-                            _AppBanner(
-                              message: _controller.errorMessage,
-                              color: AppColors.error,
+                  Column(
+                    children: [
+                      if (useDesktopWindowChrome) const DesktopTitleBar(),
+                      Expanded(
+                        child: SafeArea(
+                          top: !useDesktopWindowChrome,
+                          child: switch (_controller.page) {
+                            AppPage.chat ||
+                            AppPage.profile ||
+                            AppPage.contacts => AppShell(
+                              navRailOverlapTop: useDesktopWindowChrome
+                                  ? 42
+                                  : 0,
+                              child: AppRouter(controller: _controller),
                             ),
-                          if (_controller.infoMessage.isNotEmpty)
-                            _AppBanner(
-                              message: _controller.infoMessage,
-                              color: AppColors.textMuted,
+                            AppPage.landing ||
+                            AppPage.login ||
+                            AppPage.register => AppRouter(
+                              controller: _controller,
                             ),
-                          Expanded(
-                            child: switch (_controller.page) {
-                              AppPage.chat ||
-                              AppPage.profile ||
-                              AppPage.contacts => AppShell(
-                                navRailOverlapTop: useDesktopWindowChrome
-                                    ? 42
-                                    : 0,
-                                child: AppRouter(controller: _controller),
-                              ),
-                              AppPage.landing ||
-                              AppPage.login ||
-                              AppPage.register => AppRouter(
-                                controller: _controller,
-                              ),
-                            },
-                          ),
-                        ],
+                          },
+                        ),
                       ),
-                    ),
+                    ],
+                  ),
+                  _AppBannerOverlay(
+                    desktopOffset: useDesktopWindowChrome ? 42 : 0,
+                    errorMessage: _controller.errorMessage,
+                    infoMessage: _controller.infoMessage,
                   ),
                 ],
               ),
@@ -174,6 +189,59 @@ class _AppBanner extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(message, style: TextStyle(color: color)),
+      ),
+    );
+  }
+}
+
+class _AppBannerOverlay extends StatelessWidget {
+  const _AppBannerOverlay({
+    required this.desktopOffset,
+    required this.errorMessage,
+    required this.infoMessage,
+  });
+
+  final double desktopOffset;
+  final String errorMessage;
+  final String infoMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasBanner = errorMessage.isNotEmpty || infoMessage.isNotEmpty;
+
+    return IgnorePointer(
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16, desktopOffset + 16, 16, 0),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                child: !hasBanner
+                    ? const SizedBox.shrink()
+                    : Column(
+                        key: ValueKey('$errorMessage|$infoMessage'),
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (errorMessage.isNotEmpty)
+                            _AppBanner(
+                              message: errorMessage,
+                              color: AppColors.error,
+                            ),
+                          if (infoMessage.isNotEmpty)
+                            _AppBanner(
+                              message: infoMessage,
+                              color: AppColors.textMuted,
+                            ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

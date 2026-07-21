@@ -274,7 +274,7 @@ class _ContactsGrid extends StatelessWidget {
           itemCount: contacts.length,
           itemBuilder: (context, index) {
             final contact = contacts[index];
-            return ContactCard(name: contact.name, onTap: () {});
+            return ContactCard(contact: contact, onTap: () {});
           },
         );
       },
@@ -323,12 +323,12 @@ class _ContactRequestRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  request.name,
+                  request.displayName,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
-                if (request.username.isNotEmpty)
+                if (request.localHandle.isNotEmpty)
                   Text(
-                    '@${request.username}',
+                    '@${request.localHandle}',
                     style: const TextStyle(color: AppColors.textSecondary),
                   ),
               ],

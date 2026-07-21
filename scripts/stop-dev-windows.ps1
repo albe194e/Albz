@@ -13,3 +13,13 @@ $processes = Get-CimInstance Win32_Process | Where-Object {
 foreach ($process in $processes) {
     taskkill /PID $process.ProcessId /T /F | Out-Null
 }
+
+$frontendProcesses = Get-CimInstance Win32_Process | Where-Object {
+    $_.Name -eq "frontend_flutter.exe" -and
+    $_.ExecutablePath -and
+    $_.ExecutablePath -like "*app\frontend_flutter\build\windows\x64\runner\Debug\frontend_flutter.exe"
+}
+
+foreach ($process in $frontendProcesses) {
+    taskkill /PID $process.ProcessId /T /F | Out-Null
+}

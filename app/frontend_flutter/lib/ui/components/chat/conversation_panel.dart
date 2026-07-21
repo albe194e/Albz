@@ -39,7 +39,7 @@ class ConversationPanel extends StatelessWidget {
               itemBuilder: (context, index) {
                 final message = messages[index];
                 final isOwnMessage =
-                    message.senderId == controller.currentUser?.id;
+                    message.senderUserId == controller.currentUser?.userId;
                 return _MessageBubble(message: message, alignEnd: isOwnMessage);
               },
             ),
@@ -77,7 +77,7 @@ class _MessageBubble extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
-                      message.senderId,
+                      message.senderUserId,
                       style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 12,

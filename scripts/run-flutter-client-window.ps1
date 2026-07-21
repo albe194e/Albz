@@ -2,23 +2,20 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$WorkspaceRoot,
 
-    [string]$Profile = "",
-
-    [string]$Flutter = "flutter"
+    [string]$Profile = ""
 )
 
-$windowTitle = "Haddle Dev Client"
-if (-not [string]::IsNullOrWhiteSpace($Profile)) {
-    $windowTitle = "Haddle Dev Client $Profile"
+$exePath = Join-Path $WorkspaceRoot "app/frontend_flutter\build\windows\x64\runner\Debug\frontend_flutter.exe"
+
+if (-not (Test-Path -LiteralPath $exePath)) {
+    throw "Windows client executable not found at '$exePath'. Run 'make build-client-windows-debug' or 'make run-client' first."
 }
 
-$Host.UI.RawUI.WindowTitle = $windowTitle
-
-Set-Location (Join-Path $WorkspaceRoot "app/frontend_flutter")
-
-$arguments = @("run", "-d", "windows", "--dart-define=HADDLE_DEV_MODE=true")
-if (-not [string]::IsNullOrWhiteSpace($Profile)) {
-    $arguments += "--dart-define=HADDLE_PROFILE=$Profile"
+$env:HADDLE_DEV_MODE = "1"
+if ([string]::IsNullOrWhiteSpace($Profile)) {
+    Remove-Item Env:\HADDLE_PROFILE -ErrorAction SilentlyContinue
+} else {
+    $env:HADDLE_PROFILE = $Profile
 }
 
-& $Flutter @arguments
+Start-Process -FilePath $exePath -WorkingDirectory (Split-Path -Parent $exePath)

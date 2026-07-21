@@ -19,7 +19,7 @@ The local schema currently stores:
 - `messages`: local message history, globally unique message IDs, sender user/device identifiers, client message identifiers, timestamps, direction, and delivery state
 - `contacts`: accepted local contact records, including local display names, optional local handles, optional local profile picture paths, contact codes, and creation times
 - `contact_devices`: locally stored public keys for known contact devices so the client can prepare for future encrypted multi-device delivery without asking the relay server to own that data
-- `contact_requests`: local contact request records, including sender user/device identifiers, local display data, optional sender public keys, contact codes, invite payloads, request state, and creation time
+- `contact_requests`: local contact request records, including sender user/device identifiers, local display data, optional sender profile picture paths, optional sender public keys, contact codes, invite payloads, request state, and creation time
 
 If a user selects a profile picture, the image file itself is stored locally on the device in an `images/` directory under the same local client data directory that holds the SQLite database. The database stores a local filesystem path such as `local_identity.profile_picture_path` or `contacts.profile_picture_path`, not a server-owned profile URL.
 
@@ -55,10 +55,13 @@ The server relays live WebSocket events between connected clients. Those events 
 - relay auth challenge/response material used to prove possession of the local device private key without sending that private key to the server
 - message bodies, conversation identifiers, and recipient user identifiers during `message.send` / `message.created`
 - conversation creation events, including the selected participant user identifiers and any explicitly chosen conversation name
-- contact request events, which now also include sender device identifiers and sender device public keys
-- contact request acceptance and rejection events
+- contact request events, which now also include sender device identifiers, sender device public keys, and an explicitly shared profile picture as raw image bytes when the sender has chosen one
+- contact request acceptance events, which can now also include an explicitly shared profile picture as raw image bytes
+- contact request rejection events
 
 The server needs to see enough event data to route it to the intended connected recipient in the current implementation.
+
+When a contact request or contact acceptance event includes a shared profile picture, the receiving client saves those bytes into its own local `images/` storage. Pending requests store the resulting local filesystem path in `contact_requests.profile_picture_path`, and accepted contacts store it in `contacts.profile_picture_path`. The relay forwards those bytes in transit but does not store the image file durably.
 
 ## Data the server does not currently store durably
 

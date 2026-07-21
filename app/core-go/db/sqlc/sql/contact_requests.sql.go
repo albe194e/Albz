@@ -21,7 +21,7 @@ func (q *Queries) DeleteContactRequestByFromUserID(ctx context.Context, fromUser
 }
 
 const listContactRequests = `-- name: ListContactRequests :many
-SELECT id, from_user_id, from_device_id, display_name, local_handle, from_public_key, from_contact_code, invite_payload, state, created_at
+SELECT id, from_user_id, from_device_id, display_name, local_handle, profile_picture_path, from_public_key, from_contact_code, invite_payload, state, created_at
 FROM contact_requests
 ORDER BY created_at ASC
 `
@@ -41,6 +41,7 @@ func (q *Queries) ListContactRequests(ctx context.Context) ([]ContactRequest, er
 			&i.FromDeviceID,
 			&i.DisplayName,
 			&i.LocalHandle,
+			&i.ProfilePicturePath,
 			&i.FromPublicKey,
 			&i.FromContactCode,
 			&i.InvitePayload,
@@ -66,18 +67,20 @@ INSERT INTO contact_requests (
 	from_device_id,
 	display_name,
 	local_handle,
+	profile_picture_path,
 	from_public_key,
 	from_contact_code,
 	invite_payload,
 	state,
 	created_at
 ) VALUES (
-	?, ?, ?, ?, ?, ?, ?, ?, ?
+	?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 )
 ON CONFLICT(from_user_id) DO UPDATE SET
 	from_device_id = excluded.from_device_id,
 	display_name = excluded.display_name,
 	local_handle = excluded.local_handle,
+	profile_picture_path = excluded.profile_picture_path,
 	from_public_key = excluded.from_public_key,
 	from_contact_code = excluded.from_contact_code,
 	invite_payload = excluded.invite_payload,
@@ -86,15 +89,16 @@ ON CONFLICT(from_user_id) DO UPDATE SET
 `
 
 type UpsertContactRequestParams struct {
-	FromUserID      string         `db:"from_user_id" json:"from_user_id"`
-	FromDeviceID    sql.NullString `db:"from_device_id" json:"from_device_id"`
-	DisplayName     string         `db:"display_name" json:"display_name"`
-	LocalHandle     sql.NullString `db:"local_handle" json:"local_handle"`
-	FromPublicKey   []byte         `db:"from_public_key" json:"from_public_key"`
-	FromContactCode sql.NullString `db:"from_contact_code" json:"from_contact_code"`
-	InvitePayload   string         `db:"invite_payload" json:"invite_payload"`
-	State           string         `db:"state" json:"state"`
-	CreatedAt       int64          `db:"created_at" json:"created_at"`
+	FromUserID         string         `db:"from_user_id" json:"from_user_id"`
+	FromDeviceID       sql.NullString `db:"from_device_id" json:"from_device_id"`
+	DisplayName        string         `db:"display_name" json:"display_name"`
+	LocalHandle        sql.NullString `db:"local_handle" json:"local_handle"`
+	ProfilePicturePath sql.NullString `db:"profile_picture_path" json:"profile_picture_path"`
+	FromPublicKey      []byte         `db:"from_public_key" json:"from_public_key"`
+	FromContactCode    sql.NullString `db:"from_contact_code" json:"from_contact_code"`
+	InvitePayload      string         `db:"invite_payload" json:"invite_payload"`
+	State              string         `db:"state" json:"state"`
+	CreatedAt          int64          `db:"created_at" json:"created_at"`
 }
 
 func (q *Queries) UpsertContactRequest(ctx context.Context, arg UpsertContactRequestParams) error {
@@ -103,6 +107,7 @@ func (q *Queries) UpsertContactRequest(ctx context.Context, arg UpsertContactReq
 		arg.FromDeviceID,
 		arg.DisplayName,
 		arg.LocalHandle,
+		arg.ProfilePicturePath,
 		arg.FromPublicKey,
 		arg.FromContactCode,
 		arg.InvitePayload,

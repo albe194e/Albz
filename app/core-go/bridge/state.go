@@ -150,19 +150,21 @@ func snapshotFromState(state *clientapp.AppState) Snapshot {
 	for _, request := range state.ContactRequests {
 		localHandle := nullableStringValue(request.LocalHandle)
 		fromContactCode := nullableStringValue(request.FromContactCode)
+		profilePicturePath := nullableStringValue(request.ProfilePicturePath)
 
 		snapshot.ContactRequests = append(snapshot.ContactRequests, ContactRequest{
-			ID:              request.ID,
-			FromUserID:      request.FromUserID,
-			FromDeviceID:    nullableStringValue(request.FromDeviceID),
-			DisplayName:     request.DisplayName,
-			Name:            request.DisplayName,
-			LocalHandle:     localHandle,
-			Username:        localHandle,
-			FromContactCode: fromContactCode,
-			InvitePayload:   request.InvitePayload,
-			State:           request.State,
-			CreatedAt:       request.CreatedAt,
+			ID:                 request.ID,
+			FromUserID:         request.FromUserID,
+			FromDeviceID:       nullableStringValue(request.FromDeviceID),
+			DisplayName:        request.DisplayName,
+			Name:               request.DisplayName,
+			LocalHandle:        localHandle,
+			Username:           localHandle,
+			ProfilePicturePath: profilePicturePath,
+			FromContactCode:    fromContactCode,
+			InvitePayload:      request.InvitePayload,
+			State:              request.State,
+			CreatedAt:          request.CreatedAt,
 		})
 	}
 

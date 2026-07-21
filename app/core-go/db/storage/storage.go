@@ -497,6 +497,12 @@ func migrateContactRequestsTable(ctx context.Context, conn *sql.DB) error {
 		}
 	}
 
+	if _, ok := columnTypes["profile_picture_path"]; !ok {
+		if _, err := conn.ExecContext(ctx, `ALTER TABLE contact_requests ADD COLUMN profile_picture_path TEXT;`); err != nil {
+			return fmt.Errorf("add contact_requests.profile_picture_path column: %w", err)
+		}
+	}
+
 	if _, ok := columnTypes["from_public_key"]; !ok {
 		if _, err := conn.ExecContext(ctx, `ALTER TABLE contact_requests ADD COLUMN from_public_key BLOB;`); err != nil {
 			return fmt.Errorf("add contact_requests.from_public_key column: %w", err)

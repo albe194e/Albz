@@ -129,6 +129,7 @@ type PublicContactProfile struct {
 	UserID          string `json:"user_id,omitempty"`
 	DeviceID        string `json:"device_id,omitempty"`
 	DevicePublicKey []byte `json:"device_public_key,omitempty"`
+	ProfilePicture  []byte `json:"profile_picture,omitempty"`
 	ContactCode     string `json:"contact_code"`
 	Name            string `json:"name"`
 	Username        string `json:"username"`

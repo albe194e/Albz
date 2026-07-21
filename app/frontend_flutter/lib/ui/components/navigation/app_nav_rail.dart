@@ -66,7 +66,7 @@ class AppNavRail extends StatelessWidget {
                 selected: page == AppPage.profile,
                 onPressed: () => controller.navigateTo(AppPage.profile),
                 child: ProfilePicture(
-                  path: controller.currentUser?.profilePictureUrl ?? '',
+                  path: controller.currentUser?.profilePicturePath ?? '',
                   size: 28,
                 ),
               ),

@@ -172,39 +172,60 @@ class CoreConfig {
 class CoreUser {
   const CoreUser({
     required this.id,
+    required this.userId,
+    required this.deviceId,
     required this.name,
-    required this.username,
-    required this.profilePictureUrl,
+    required this.localHandle,
+    required this.profilePicturePath,
     required this.contactCode,
   });
 
   final String id;
+  final String userId;
+  final String deviceId;
   final String name;
-  final String username;
-  final String profilePictureUrl;
+  final String localHandle;
+  final String profilePicturePath;
   final String contactCode;
+
+  String get username => localHandle;
+  String get profilePictureUrl => profilePicturePath;
 
   factory CoreUser.fromJson(Map<String, dynamic> json) {
     return CoreUser(
       id: json['id'] as String? ?? '',
+      userId: json['user_id'] as String? ?? '',
+      deviceId: json['device_id'] as String? ?? '',
       name: json['name'] as String? ?? '',
-      username: json['username'] as String? ?? '',
-      profilePictureUrl: json['profile_picture_url'] as String? ?? '',
+      localHandle: json['local_handle'] as String? ?? '',
+      profilePicturePath: json['profile_picture_path'] as String? ?? '',
       contactCode: json['contact_code'] as String? ?? '',
     );
   }
 }
 
 class CoreConversation {
-  const CoreConversation({required this.id, required this.name});
+  const CoreConversation({
+    required this.id,
+    required this.name,
+    required this.type,
+    required this.createdAt,
+    required this.updatedAt,
+  });
 
   final String id;
   final String name;
+  final String type;
+  final int createdAt;
+  final int updatedAt;
 
   factory CoreConversation.fromJson(Map<String, dynamic> json) {
     return CoreConversation(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+      createdAt: json['created_at'] as int? ?? 0,
+      updatedAt: json['updated_at'] as int? ?? 0,
     );
   }
 }
@@ -213,29 +234,41 @@ class CoreMessage {
   const CoreMessage({
     required this.id,
     required this.conversationId,
-    required this.senderId,
+    required this.senderUserId,
+    required this.senderDeviceId,
     required this.clientMessageId,
     required this.body,
     required this.createdAt,
+    required this.receivedAt,
+    required this.direction,
     required this.deliveryState,
   });
 
-  final int id;
+  final String id;
   final String conversationId;
-  final String senderId;
+  final String senderUserId;
+  final String senderDeviceId;
   final String clientMessageId;
   final String body;
   final int createdAt;
+  final int receivedAt;
+  final String direction;
   final String deliveryState;
+
+  String get senderId => senderUserId;
 
   factory CoreMessage.fromJson(Map<String, dynamic> json) {
     return CoreMessage(
-      id: json['id'] as int? ?? 0,
+      id: json['id'] as String? ?? '',
       conversationId: json['conversation_id'] as String? ?? '',
-      senderId: json['sender_id'] as String? ?? '',
+      senderUserId:
+          (json['sender_user_id'] ?? json['sender_id']) as String? ?? '',
+      senderDeviceId: json['sender_device_id'] as String? ?? '',
       clientMessageId: json['client_message_id'] as String? ?? '',
       body: json['body'] as String? ?? '',
       createdAt: json['created_at'] as int? ?? 0,
+      receivedAt: json['received_at'] as int? ?? 0,
+      direction: json['direction'] as String? ?? '',
       deliveryState: json['delivery_state'] as String? ?? '',
     );
   }
@@ -245,28 +278,35 @@ class CoreContact {
   const CoreContact({
     required this.id,
     required this.userId,
-    required this.name,
-    required this.username,
-    required this.profilePictureUrl,
+    required this.displayName,
+    required this.localHandle,
+    required this.profilePicturePath,
     required this.contactCode,
     required this.createdAt,
   });
 
   final int id;
   final String userId;
-  final String name;
-  final String username;
-  final String profilePictureUrl;
+  final String displayName;
+  final String localHandle;
+  final String profilePicturePath;
   final String contactCode;
   final int createdAt;
+
+  String get name => displayName;
+  String get username => localHandle;
+  String get profilePictureUrl => profilePicturePath;
 
   factory CoreContact.fromJson(Map<String, dynamic> json) {
     return CoreContact(
       id: json['id'] as int? ?? 0,
       userId: json['user_id'] as String? ?? '',
-      name: json['name'] as String? ?? '',
-      username: json['username'] as String? ?? '',
-      profilePictureUrl: json['profile_picture_url'] as String? ?? '',
+      displayName: (json['display_name'] ?? json['name']) as String? ?? '',
+      localHandle: (json['local_handle'] ?? json['username']) as String? ?? '',
+      profilePicturePath:
+          (json['profile_picture_path'] ?? json['profile_picture_url'])
+              as String? ??
+          '',
       contactCode: json['contact_code'] as String? ?? '',
       createdAt: json['created_at'] as int? ?? 0,
     );
@@ -277,26 +317,42 @@ class CoreContactRequest {
   const CoreContactRequest({
     required this.id,
     required this.fromUserId,
-    required this.name,
-    required this.username,
+    required this.fromDeviceId,
+    required this.displayName,
+    required this.localHandle,
+    required this.profilePicturePath,
     required this.fromContactCode,
+    required this.invitePayload,
+    required this.state,
     required this.createdAt,
   });
 
   final int id;
   final String fromUserId;
-  final String name;
-  final String username;
+  final String fromDeviceId;
+  final String displayName;
+  final String localHandle;
+  final String profilePicturePath;
   final String fromContactCode;
+  final String invitePayload;
+  final String state;
   final int createdAt;
+
+  String get name => displayName;
+  String get username => localHandle;
+  String get profilePictureUrl => profilePicturePath;
 
   factory CoreContactRequest.fromJson(Map<String, dynamic> json) {
     return CoreContactRequest(
       id: json['id'] as int? ?? 0,
       fromUserId: json['from_user_id'] as String? ?? '',
-      name: json['name'] as String? ?? '',
-      username: json['username'] as String? ?? '',
+      fromDeviceId: json['from_device_id'] as String? ?? '',
+      displayName: (json['display_name'] ?? json['name']) as String? ?? '',
+      localHandle: (json['local_handle'] ?? json['username']) as String? ?? '',
+      profilePicturePath: json['profile_picture_path'] as String? ?? '',
       fromContactCode: json['from_contact_code'] as String? ?? '',
+      invitePayload: json['invite_payload'] as String? ?? '',
+      state: json['state'] as String? ?? '',
       createdAt: json['created_at'] as int? ?? 0,
     );
   }
@@ -358,9 +414,11 @@ class CoreSnapshot {
           ? null
           : {
               'id': currentUser!.id,
+              'user_id': currentUser!.userId,
+              'device_id': currentUser!.deviceId,
               'name': currentUser!.name,
-              'username': currentUser!.username,
-              'profile_picture_url': currentUser!.profilePictureUrl,
+              'local_handle': currentUser!.localHandle,
+              'profile_picture_path': currentUser!.profilePicturePath,
               'contact_code': currentUser!.contactCode,
             },
       'messages': messages
@@ -368,10 +426,13 @@ class CoreSnapshot {
             (message) => {
               'id': message.id,
               'conversation_id': message.conversationId,
-              'sender_id': message.senderId,
+              'sender_user_id': message.senderUserId,
+              'sender_device_id': message.senderDeviceId,
               'client_message_id': message.clientMessageId,
               'body': message.body,
               'created_at': message.createdAt,
+              'received_at': message.receivedAt,
+              'direction': message.direction,
               'delivery_state': message.deliveryState,
             },
           )
@@ -381,6 +442,9 @@ class CoreSnapshot {
             (conversation) => {
               'id': conversation.id,
               'name': conversation.name,
+              'type': conversation.type,
+              'created_at': conversation.createdAt,
+              'updated_at': conversation.updatedAt,
             },
           )
           .toList(growable: false),
@@ -389,9 +453,9 @@ class CoreSnapshot {
             (contact) => {
               'id': contact.id,
               'user_id': contact.userId,
-              'name': contact.name,
-              'username': contact.username,
-              'profile_picture_url': contact.profilePictureUrl,
+              'display_name': contact.displayName,
+              'local_handle': contact.localHandle,
+              'profile_picture_path': contact.profilePicturePath,
               'contact_code': contact.contactCode,
               'created_at': contact.createdAt,
             },
@@ -402,9 +466,13 @@ class CoreSnapshot {
             (request) => {
               'id': request.id,
               'from_user_id': request.fromUserId,
-              'name': request.name,
-              'username': request.username,
+              'from_device_id': request.fromDeviceId,
+              'display_name': request.displayName,
+              'local_handle': request.localHandle,
+              'profile_picture_path': request.profilePicturePath,
               'from_contact_code': request.fromContactCode,
+              'invite_payload': request.invitePayload,
+              'state': request.state,
               'created_at': request.createdAt,
             },
           )

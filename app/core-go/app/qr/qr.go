@@ -8,9 +8,6 @@ import (
 	"github.com/skip2/go-qrcode"
 )
 
-type QRPayload struct {
-}
-
 const (
 	contactCodePrefix = "HADDLE-"
 	deepLinkScheme    = "haddle"

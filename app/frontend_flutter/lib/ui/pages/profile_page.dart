@@ -49,7 +49,7 @@ class ProfilePage extends StatelessWidget {
                             if (currentUser?.username.isNotEmpty == true) ...[
                               const SizedBox(height: 8),
                               Text(
-                                '@${currentUser!.username}',
+                                '@${currentUser!.localHandle}',
                                 style: const TextStyle(
                                   color: AppColors.textSecondary,
                                 ),

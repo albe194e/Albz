@@ -129,16 +129,17 @@ func (c *Controller) HandleContactRequestReceived(event protocol.Envelope[protoc
 	}
 
 	contactCode := strings.TrimSpace(event.Payload.FromProfile.ContactCode)
-	err := c.Store.Q.UpsertContactRequest(context.Background(), sql.UpsertContactRequestParams{
-		FromUserID:      event.Payload.FromProfile.UserID,
-		FromDeviceID:    nullString(strings.TrimSpace(event.Payload.FromProfile.DeviceID)),
-		DisplayName:     event.Payload.FromProfile.Name,
-		LocalHandle:     nullString(strings.TrimSpace(event.Payload.FromProfile.Username)),
-		FromPublicKey:   append([]byte(nil), event.Payload.FromProfile.DevicePublicKey...),
-		FromContactCode: nullString(contactCode),
-		InvitePayload:   contactCode,
-		State:           "pending",
-		CreatedAt:       event.Timestamp,
+	err = c.Store.Q.UpsertContactRequest(context.Background(), sql.UpsertContactRequestParams{
+		FromUserID:         event.Payload.FromProfile.UserID,
+		FromDeviceID:       nullString(strings.TrimSpace(event.Payload.FromProfile.DeviceID)),
+		DisplayName:        event.Payload.FromProfile.Name,
+		LocalHandle:        nullString(strings.TrimSpace(event.Payload.FromProfile.Username)),
+		ProfilePicturePath: profilePicturePath,
+		FromPublicKey:      append([]byte(nil), event.Payload.FromProfile.DevicePublicKey...),
+		FromContactCode:    nullString(contactCode),
+		InvitePayload:      contactCode,
+		State:              "pending",
+		CreatedAt:          event.Timestamp,
 	})
 	if err != nil {
 		c.State.LastNetworkError = fmt.Sprintf("store contact request: %v", err)
@@ -165,13 +166,14 @@ func (c *Controller) HandleContactRequestAccepted(event protocol.Envelope[protoc
 		return
 	}
 
+	request, err := c.findContactRequestByUserID(profile.UserID)
+	if err != nil {
+		c.State.LastNetworkError = fmt.Sprintf("load accepted contact request: %v", err)
+		c.notifyStateChanged()
+		return
+	}
+
 	if profile.Name == "" || profile.Username == "" || profile.ContactCode == "" {
-		request, err := c.findContactRequestByUserID(profile.UserID)
-		if err != nil {
-			c.State.LastNetworkError = fmt.Sprintf("load accepted contact request: %v", err)
-			c.notifyStateChanged()
-			return
-		}
 		if request != nil {
 			if profile.Name == "" {
 				profile.Name = request.DisplayName
@@ -185,11 +187,21 @@ func (c *Controller) HandleContactRequestAccepted(event protocol.Envelope[protoc
 		}
 	}
 
+	profilePicturePath, err := c.saveSharedContactProfilePicture(profile)
+	if err != nil {
+		c.State.LastNetworkError = fmt.Sprintf("save accepted contact profile picture: %v", err)
+		c.notifyStateChanged()
+		return
+	}
+	if !profilePicturePath.Valid && request != nil && request.ProfilePicturePath.Valid {
+		profilePicturePath = request.ProfilePicturePath
+	}
+
 	if err := c.Store.Q.UpsertContact(context.Background(), sql.UpsertContactParams{
 		UserID:             profile.UserID,
 		DisplayName:        profile.Name,
 		LocalHandle:        nullString(strings.TrimSpace(profile.Username)),
-		ProfilePicturePath: dsql.NullString{},
+		ProfilePicturePath: profilePicturePath,
 		ContactCode:        nullString(strings.TrimSpace(profile.ContactCode)),
 		CreatedAt:          event.Timestamp,
 	}); err != nil {
@@ -282,4 +294,27 @@ func (c *Controller) upsertContactDeviceFromProfile(ctx context.Context, profile
 		CreatedAt:     createdAt,
 		RevokedAt:     dsql.NullInt64{},
 	})
+}
+
+func (c *Controller) saveSharedContactProfilePicture(profile protocol.PublicContactProfile) (dsql.NullString, error) {
+	if len(profile.ProfilePicture) == 0 {
+		return dsql.NullString{}, nil
+	}
+	if c == nil || c.FileHandler == nil {
+		return dsql.NullString{}, fmt.Errorf("file handler is not configured")
+	}
+
+	filename := strings.TrimSpace(profile.UserID)
+	if filename == "" {
+		filename = "contact-profile-picture"
+	} else {
+		filename += "-profile-picture"
+	}
+
+	path, err := c.FileHandler.SaveImageToStorage(profile.ProfilePicture, filename)
+	if err != nil {
+		return dsql.NullString{}, err
+	}
+
+	return nullString(path), nil
 }

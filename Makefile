@@ -5,6 +5,7 @@ FRONTEND_FLUTTER_DIR := app/frontend_flutter
 DEV_SERVER_SCRIPT := $(CURDIR)\scripts\run-server-window.ps1
 DEV_CLIENT_SCRIPT := $(CURDIR)\scripts\run-flutter-client-window.ps1
 DEV_STOP_SCRIPT := $(CURDIR)\scripts\stop-dev-windows.ps1
+WINDOWS_DEBUG_EXE := app/frontend_flutter/build/windows/x64/runner/Debug/frontend_flutter.exe
 
 .PHONY: \
 	sqlc \
@@ -14,6 +15,7 @@ DEV_STOP_SCRIPT := $(CURDIR)\scripts\stop-dev-windows.ps1
 	sqlc-verify-server \
 	build-core-go-windows \
 	build-core-go-android \
+	build-client-windows-debug \
 	run-server \
 	run-client \
 	run-client-android \
@@ -55,6 +57,16 @@ build-core-go-android: ## Build Android shared libraries for the Flutter app
 	@echo "Building core-go Android shared libraries..."
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "app/core-go/build-android.ps1"
 
+$(WINDOWS_DEBUG_EXE):
+	@echo "Building Flutter Windows debug executable..."
+	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "app/core-go/build-windows.ps1"
+	@$(POWERSHELL) -NoProfile -Command "Set-Location '$(FRONTEND_FLUTTER_DIR)'; $(FLUTTER) build windows --debug --dart-define=HADDLE_DEV_MODE=true"
+
+build-client-windows-debug: ## Build the Flutter Windows debug executable for multi-client launches
+	@echo "Building Flutter Windows debug executable..."
+	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "app/core-go/build-windows.ps1"
+	@$(POWERSHELL) -NoProfile -Command "Set-Location '$(FRONTEND_FLUTTER_DIR)'; $(FLUTTER) build windows --debug --dart-define=HADDLE_DEV_MODE=true"
+
 run-server: ## Run the relay server in the current terminal
 	@$(POWERSHELL) -NoProfile -Command '$$env:HADDLE_DEV_MODE="1"; go run ./server'
 
@@ -64,20 +76,24 @@ run-client: build-core-go-windows ## Run the Flutter desktop client on Windows
 run-client-android: build-core-go-android ## Run the Flutter client on a USB-connected Android device (optional: DEVICE=<flutter-device-id>)
 	@$(POWERSHELL) -NoProfile -Command "Set-Location '$(FRONTEND_FLUTTER_DIR)'; if ([string]::IsNullOrWhiteSpace('$(DEVICE)')) { $(FLUTTER) run -d R3CX100N1WB --dart-define=HADDLE_DEV_MODE=true } else { $(FLUTTER) run -d $(DEVICE) --dart-define=HADDLE_DEV_MODE=true }"
 
-run-client-profile: build-core-go-windows ## Run the Flutter desktop client with PROFILE=<name>
-	@$(POWERSHELL) -NoProfile -Command "if ([string]::IsNullOrWhiteSpace('$(PROFILE)')) { Write-Error 'Usage: make run-client-profile PROFILE=alice'; exit 1 }; Set-Location '$(FRONTEND_FLUTTER_DIR)'; $(FLUTTER) run -d windows --dart-define=HADDLE_DEV_MODE=true --dart-define=HADDLE_PROFILE=$(PROFILE)"
+run-client-profile: $(WINDOWS_DEBUG_EXE) ## Launch the built Flutter desktop client with PROFILE=<name>
+	@$(POWERSHELL) -NoProfile -Command "if ([string]::IsNullOrWhiteSpace('$(PROFILE)')) { Write-Error 'Usage: make run-client-profile PROFILE=alice'; exit 1 }"
+	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "$(DEV_CLIENT_SCRIPT)" -WorkspaceRoot "$(CURDIR)" -Profile "$(PROFILE)"
 
-run-client-alice: build-core-go-windows ## Run the Flutter desktop client with the alice profile
-	@$(POWERSHELL) -NoProfile -Command "Set-Location '$(FRONTEND_FLUTTER_DIR)'; $(FLUTTER) run -d windows --dart-define=HADDLE_DEV_MODE=true --dart-define=HADDLE_PROFILE=alice"
+run-client-alice: $(WINDOWS_DEBUG_EXE) ## Launch the built Flutter desktop client with the alice profile
+	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "$(DEV_CLIENT_SCRIPT)" -WorkspaceRoot "$(CURDIR)" -Profile "alice"
 
-run-client-bob: build-core-go-windows ## Run the Flutter desktop client with the bob profile
-	@$(POWERSHELL) -NoProfile -Command "Set-Location '$(FRONTEND_FLUTTER_DIR)'; $(FLUTTER) run -d windows --dart-define=HADDLE_DEV_MODE=true --dart-define=HADDLE_PROFILE=bob"
+run-client-bob: $(WINDOWS_DEBUG_EXE) ## Launch the built Flutter desktop client with the bob profile
+	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "$(DEV_CLIENT_SCRIPT)" -WorkspaceRoot "$(CURDIR)" -Profile "bob"
 
-run-clients: build-core-go-windows ## Launch alice and bob Flutter client windows together
-	@$(POWERSHELL) -NoProfile -Command "Start-Process powershell.exe -WorkingDirectory '$(CURDIR)' -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','$(DEV_CLIENT_SCRIPT)','-WorkspaceRoot','$(CURDIR)','-Profile','alice','-Flutter','$(FLUTTER)'; Start-Process powershell.exe -WorkingDirectory '$(CURDIR)' -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','$(DEV_CLIENT_SCRIPT)','-WorkspaceRoot','$(CURDIR)','-Profile','bob','-Flutter','$(FLUTTER)'"
+run-clients: $(WINDOWS_DEBUG_EXE) ## Launch alice and bob Flutter client windows together
+	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "$(DEV_CLIENT_SCRIPT)" -WorkspaceRoot "$(CURDIR)" -Profile "alice"
+	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "$(DEV_CLIENT_SCRIPT)" -WorkspaceRoot "$(CURDIR)" -Profile "bob"
 
-run-dev: build-core-go-windows ## Launch the server plus alice and bob Flutter client windows together
-	@$(POWERSHELL) -NoProfile -Command "Start-Process powershell.exe -WorkingDirectory '$(CURDIR)' -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','$(DEV_SERVER_SCRIPT)','-WorkspaceRoot','$(CURDIR)'; Start-Process powershell.exe -WorkingDirectory '$(CURDIR)' -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','$(DEV_CLIENT_SCRIPT)','-WorkspaceRoot','$(CURDIR)','-Profile','alice','-Flutter','$(FLUTTER)'; Start-Process powershell.exe -WorkingDirectory '$(CURDIR)' -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','$(DEV_CLIENT_SCRIPT)','-WorkspaceRoot','$(CURDIR)','-Profile','bob','-Flutter','$(FLUTTER)'"
+run-dev: $(WINDOWS_DEBUG_EXE) ## Launch the server plus alice and bob Flutter client windows together
+	@$(POWERSHELL) -NoProfile -Command "Start-Process powershell.exe -WorkingDirectory '$(CURDIR)' -ArgumentList '-NoExit','-ExecutionPolicy','Bypass','-File','$(DEV_SERVER_SCRIPT)','-WorkspaceRoot','$(CURDIR)'"
+	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "$(DEV_CLIENT_SCRIPT)" -WorkspaceRoot "$(CURDIR)" -Profile "alice"
+	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "$(DEV_CLIENT_SCRIPT)" -WorkspaceRoot "$(CURDIR)" -Profile "bob"
 
 stop-dev: ## Stop the server and client windows started by run-dev/run-clients
 	@$(POWERSHELL) -NoProfile -ExecutionPolicy Bypass -File "$(DEV_STOP_SCRIPT)"

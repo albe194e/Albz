@@ -52,9 +52,14 @@ func (c *Controller) SendContactRequest(ctx context.Context, contactCode string)
 		}
 	}
 
+	fromProfile, err := c.currentPublicContactProfile(true)
+	if err != nil {
+		return err
+	}
+
 	return c.Net.SendContactRequest(uuid.NewString(), protocol.ContactRequestSendPayload{
 		ContactCode: trimmedContactCode,
-		FromProfile: c.currentPublicContactProfile(),
+		FromProfile: fromProfile,
 	})
 }
 
@@ -72,9 +77,14 @@ func (c *Controller) AcceptContactRequest(ctx context.Context, fromUserID string
 		}
 	}
 
+	acceptProfile, err := c.currentPublicContactProfile(true)
+	if err != nil {
+		return err
+	}
+
 	return c.Net.AcceptContactRequest(uuid.NewString(), protocol.ContactRequestAcceptPayload{
 		FromUserID:    fromUserID,
-		AcceptProfile: c.currentPublicContactProfile(),
+		AcceptProfile: acceptProfile,
 	})
 }
 
@@ -105,17 +115,50 @@ func (c *Controller) GetContactQRCode() ([]byte, error) {
 	return qr.GenerateContactQRCode(nullStringValue(c.State.CurrentUser.ContactCode))
 }
 
-func (c *Controller) currentPublicContactProfile() protocol.PublicContactProfile {
+func (c *Controller) currentPublicContactProfile(includeProfilePicture bool) (protocol.PublicContactProfile, error) {
 	if c == nil || c.State == nil || c.State.CurrentUser == nil {
-		return protocol.PublicContactProfile{}
+		return protocol.PublicContactProfile{}, fmt.Errorf("no current user")
+	}
+
+	var profilePicture []byte
+	if includeProfilePicture {
+		var err error
+		profilePicture, err = c.loadCurrentProfilePictureBytes()
+		if err != nil {
+			return protocol.PublicContactProfile{}, err
+		}
 	}
 
 	return protocol.PublicContactProfile{
 		UserID:          c.State.CurrentUser.UserID,
 		DeviceID:        c.State.CurrentUser.DeviceID,
 		DevicePublicKey: append([]byte(nil), c.State.CurrentUser.DevicePublicKey...),
+		ProfilePicture:  profilePicture,
 		ContactCode:     nullStringValue(c.State.CurrentUser.ContactCode),
 		Name:            c.State.CurrentUser.Name,
 		Username:        nullStringValue(c.State.CurrentUser.LocalHandle),
+	}, nil
+}
+
+func (c *Controller) loadCurrentProfilePictureBytes() ([]byte, error) {
+	if c == nil || c.State == nil || c.State.CurrentUser == nil {
+		return nil, fmt.Errorf("no current user")
 	}
+
+	profilePicturePath := strings.TrimSpace(
+		nullStringValue(c.State.CurrentUser.ProfilePicturePath),
+	)
+	if profilePicturePath == "" {
+		return nil, nil
+	}
+	if c.FileHandler == nil {
+		return nil, fmt.Errorf("file handler is not configured")
+	}
+
+	loadedImage, err := c.FileHandler.LoadImageFromPath(profilePicturePath)
+	if err != nil {
+		return nil, fmt.Errorf("load shared profile picture: %w", err)
+	}
+
+	return append([]byte(nil), loadedImage.File.Data...), nil
 }

@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS contact_requests (
 	from_device_id TEXT,
 	display_name TEXT NOT NULL,
 	local_handle TEXT,
+	profile_picture_path TEXT,
 	from_public_key BLOB,
 	from_contact_code TEXT,
 	invite_payload TEXT NOT NULL,

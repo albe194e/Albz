@@ -1,11 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 
 class AppLog {
   AppLog._();
 
-  static final bool devMode = _parseDevMode(
-    const String.fromEnvironment('HADDLE_DEV_MODE', defaultValue: 'true'),
-  );
+  static final bool devMode = _resolveDevMode();
 
   static void debug(String message) {
     if (!devMode) {
@@ -59,5 +59,25 @@ class AppLog {
       default:
         return true;
     }
+  }
+
+  static bool _resolveDevMode() {
+    const compileTimeValue = String.fromEnvironment('HADDLE_DEV_MODE');
+    if (compileTimeValue.isNotEmpty) {
+      return _parseDevMode(compileTimeValue);
+    }
+
+    if (_supportsRuntimeEnvironment()) {
+      final runtimeValue = Platform.environment['HADDLE_DEV_MODE'];
+      if (runtimeValue != null && runtimeValue.isNotEmpty) {
+        return _parseDevMode(runtimeValue);
+      }
+    }
+
+    return true;
+  }
+
+  static bool _supportsRuntimeEnvironment() {
+    return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
   }
 }

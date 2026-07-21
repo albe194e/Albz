@@ -115,7 +115,7 @@ class MobileAppDrawer extends StatelessWidget {
                       selected: page == AppPage.profile,
                       label: 'Profile',
                       icon: ProfilePicture(
-                        path: controller.currentUser?.profilePictureUrl ?? '',
+                        path: controller.currentUser?.profilePicturePath ?? '',
                         size: 28,
                       ),
                       onTap: () => controller.navigateTo(AppPage.profile),

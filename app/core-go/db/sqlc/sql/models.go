@@ -28,16 +28,17 @@ type ContactDevice struct {
 }
 
 type ContactRequest struct {
-	ID              int64          `db:"id" json:"id"`
-	FromUserID      string         `db:"from_user_id" json:"from_user_id"`
-	FromDeviceID    sql.NullString `db:"from_device_id" json:"from_device_id"`
-	DisplayName     string         `db:"display_name" json:"display_name"`
-	LocalHandle     sql.NullString `db:"local_handle" json:"local_handle"`
-	FromPublicKey   []byte         `db:"from_public_key" json:"from_public_key"`
-	FromContactCode sql.NullString `db:"from_contact_code" json:"from_contact_code"`
-	InvitePayload   string         `db:"invite_payload" json:"invite_payload"`
-	State           string         `db:"state" json:"state"`
-	CreatedAt       int64          `db:"created_at" json:"created_at"`
+	ID                 int64          `db:"id" json:"id"`
+	FromUserID         string         `db:"from_user_id" json:"from_user_id"`
+	FromDeviceID       sql.NullString `db:"from_device_id" json:"from_device_id"`
+	DisplayName        string         `db:"display_name" json:"display_name"`
+	LocalHandle        sql.NullString `db:"local_handle" json:"local_handle"`
+	ProfilePicturePath sql.NullString `db:"profile_picture_path" json:"profile_picture_path"`
+	FromPublicKey      []byte         `db:"from_public_key" json:"from_public_key"`
+	FromContactCode    sql.NullString `db:"from_contact_code" json:"from_contact_code"`
+	InvitePayload      string         `db:"invite_payload" json:"invite_payload"`
+	State              string         `db:"state" json:"state"`
+	CreatedAt          int64          `db:"created_at" json:"created_at"`
 }
 
 type Conversation struct {
