@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"github.com/albe194e/albz/app/core-go/db"
 	"github.com/albe194e/albz/app/core-go/domains/contacts"
 	"github.com/albe194e/albz/app/core-go/domains/conversations"
 	"github.com/albe194e/albz/app/core-go/domains/identity"
@@ -11,7 +10,6 @@ import (
 )
 
 type Options struct {
-	Store       *db.Store
 	FileHandler *file.Handler
 	ServerURL   string
 }
@@ -31,10 +29,10 @@ type Controller struct {
 func NewController(options Options) *Controller {
 	c := &Controller{
 		State:               &AppState{},
-		IdentityService:     identity.NewService(options.Store.Q),
-		ContactService:      contacts.NewService(options.Store.Q),
-		ConversationService: conversations.NewService(options.Store.Q),
-		MessageService:      messages.NewService(options.Store.Q),
+		IdentityService:     identity.NewService(),
+		ContactService:      contacts.NewService(),
+		ConversationService: conversations.NewService(),
+		MessageService:      messages.NewService(),
 		FileHandler:         options.FileHandler,
 	}
 

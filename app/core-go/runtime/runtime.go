@@ -55,7 +55,6 @@ func New(ctx context.Context, options Options) (*Service, error) {
 	}
 
 	controller := controllers.NewController(controllers.Options{
-		Store:       store,
 		FileHandler: fileHandler,
 		ServerURL:   config.ServerURL,
 	})

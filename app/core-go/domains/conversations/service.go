@@ -3,19 +3,17 @@ package conversations
 import (
 	"context"
 
-	dbsql "github.com/albe194e/albz/app/core-go/db/sqlc/generated"
+	dbsql "github.com/albe194e/albz/app/core-go/db"
 )
 
-type Service struct {
-	queries *dbsql.Queries
-}
+type Service struct{}
 
-func NewService(queries *dbsql.Queries) *Service {
-	return &Service{queries: queries}
+func NewService() *Service {
+	return &Service{}
 }
 
 func (s *Service) ListByUserID(ctx context.Context, userID string) ([]Conversation, error) {
-	rows, err := s.queries.GetConversationsByUserID(ctx, userID)
+	rows, err := dbsql.Queries.GetConversationsByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -28,19 +26,19 @@ func (s *Service) ListByUserID(ctx context.Context, userID string) ([]Conversati
 }
 
 func (s *Service) GetByID(ctx context.Context, conversationID string) (Conversation, error) {
-	row, err := s.queries.GetConversationByID(ctx, conversationID)
+	row, err := dbsql.Queries.GetConversationByID(ctx, conversationID)
 	return Conversation{Conversation: row}, err
 }
 
 func (s *Service) Create(ctx context.Context, params CreateParams) (Conversation, error) {
-	row, err := s.queries.CreateConversation(ctx, params)
+	row, err := dbsql.Queries.CreateConversation(ctx, params)
 	return Conversation{Conversation: row}, err
 }
 
 func (s *Service) AddParticipant(ctx context.Context, params AddParticipantParams) error {
-	return s.queries.AddParticipant(ctx, params)
+	return dbsql.Queries.AddParticipant(ctx, params)
 }
 
 func (s *Service) ListParticipantIDs(ctx context.Context, conversationID string) ([]string, error) {
-	return s.queries.ListConversationParticipantIDs(ctx, conversationID)
+	return dbsql.Queries.ListConversationParticipantIDs(ctx, conversationID)
 }

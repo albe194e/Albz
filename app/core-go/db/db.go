@@ -15,8 +15,9 @@ import (
 
 type Store struct {
 	DB *sql.DB
-	Q  *dbsql.Queries
 }
+
+var Queries *dbsql.Queries
 
 func OpenSQLite(ctx context.Context, dbPath string, schemaSQL string) (*Store, error) {
 	if dbPath == "" {
@@ -82,10 +83,8 @@ func OpenSQLite(ctx context.Context, dbPath string, schemaSQL string) (*Store, e
 		return nil, fmt.Errorf("migrate contact requests table: %w", err)
 	}
 
-	return &Store{
-		DB: conn,
-		Q:  dbsql.New(conn),
-	}, nil
+	Queries = dbsql.New(conn)
+	return &Store{DB: conn}, nil
 }
 
 func migrateLocalIdentityTable(ctx context.Context, conn *sql.DB) error {
