@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	clientapp "github.com/albe194e/albz/app/core-go/app"
+	"github.com/albe194e/albz/app/core-go/controllers"
 	coreruntime "github.com/albe194e/albz/app/core-go/runtime"
 )
 
@@ -46,7 +46,7 @@ func (b *Bridge) Close() error {
 	return b.service.Close()
 }
 
-func (b *Bridge) controller() *clientapp.Controller {
+func (b *Bridge) controller() *controllers.Controller {
 	if b == nil || b.service == nil || b.service.Controller == nil {
 		panic("bridge controller is not initialized")
 	}

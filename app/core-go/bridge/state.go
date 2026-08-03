@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	clientapp "github.com/albe194e/albz/app/core-go/app"
-	dbsql "github.com/albe194e/albz/app/core-go/db/sqlc/sql"
+	"github.com/albe194e/albz/app/core-go/controllers"
+	domaincontacts "github.com/albe194e/albz/app/core-go/domains/contacts"
 )
 
 func (b *Bridge) SetEventSink(sink EventSink) error {
@@ -84,7 +84,7 @@ func snapshotPointer(snapshot Snapshot) *Snapshot {
 	return &snapshot
 }
 
-func snapshotFromState(state *clientapp.AppState) Snapshot {
+func snapshotFromState(state *controllers.AppState) Snapshot {
 	if state == nil {
 		return Snapshot{}
 	}
@@ -171,7 +171,7 @@ func snapshotFromState(state *clientapp.AppState) Snapshot {
 	return snapshot
 }
 
-func mapContact(contact dbsql.Contact) Contact {
+func mapContact(contact domaincontacts.Contact) Contact {
 	localHandle := nullableStringValue(contact.LocalHandle)
 	profilePicturePath := nullableStringValue(contact.ProfilePicturePath)
 	contactCode := nullableStringValue(contact.ContactCode)

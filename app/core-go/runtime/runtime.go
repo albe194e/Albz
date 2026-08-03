@@ -11,11 +11,10 @@ import (
 	"strings"
 	"unicode"
 
-	clientapp "github.com/albe194e/albz/app/core-go/app"
-	"github.com/albe194e/albz/app/core-go/app/file"
+	"github.com/albe194e/albz/app/core-go/controllers"
+	"github.com/albe194e/albz/app/core-go/db"
 	dbsqlc "github.com/albe194e/albz/app/core-go/db/sqlc"
-	"github.com/albe194e/albz/app/core-go/db/storage"
-	"github.com/albe194e/albz/app/core-go/network"
+	"github.com/albe194e/albz/app/core-go/file"
 )
 
 type Options struct {
@@ -33,8 +32,8 @@ type Config struct {
 
 type Service struct {
 	Config      Config
-	Store       *storage.Store
-	Controller  *clientapp.Controller
+	Store       *db.Store
+	Controller  *controllers.Controller
 	FileHandler *file.Handler
 }
 
@@ -44,7 +43,7 @@ func New(ctx context.Context, options Options) (*Service, error) {
 		return nil, err
 	}
 
-	store, err := storage.OpenSQLite(ctx, config.DBPath, dbsqlc.SchemaSQL)
+	store, err := db.OpenSQLite(ctx, config.DBPath, dbsqlc.SchemaSQL)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
@@ -55,21 +54,10 @@ func New(ctx context.Context, options Options) (*Service, error) {
 		return nil, fmt.Errorf("create file handler: %w", err)
 	}
 
-	appState := &clientapp.AppState{}
-	controller := &clientapp.Controller{
-		State:       appState,
+	controller := controllers.NewController(controllers.Options{
 		Store:       store,
 		FileHandler: fileHandler,
-	}
-	controller.Net = network.NewClient(config.ServerURL, network.Handlers{
-		OnConversationCreated:    controller.HandleConversationCreated,
-		OnMessageCreated:         controller.HandleIncomingMessage,
-		OnMessageDelivery:        controller.HandleMessageDelivery,
-		OnContactRequestReceived: controller.HandleContactRequestReceived,
-		OnContactRequestAccepted: controller.HandleContactRequestAccepted,
-		OnContactRequestRejected: controller.HandleContactRequestRejected,
-		OnError:                  controller.HandleNetworkError,
-		OnDisconnect:             controller.HandleDisconnect,
+		ServerURL:   config.ServerURL,
 	})
 
 	return &Service{
@@ -86,8 +74,8 @@ func (s *Service) Close() error {
 	}
 
 	var closeErr error
-	if s.Controller != nil && s.Controller.Net != nil {
-		closeErr = s.Controller.Net.Close()
+	if s.Controller != nil && s.Controller.Relay != nil {
+		closeErr = s.Controller.Relay.Close()
 	}
 	if s.Store != nil {
 		if err := s.Store.Close(); err != nil && closeErr == nil {
